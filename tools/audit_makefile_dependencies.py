@@ -30,6 +30,27 @@ def referenced_paths(text):
             paths.update(PATH_PATTERN.findall(line))
     return paths
 
+# Only known path-bearing Make variables; arbitrary assignments are not dependencies.
+PATH_VARIABLES = frozenset({"BOARD_CUSTOM_BOOTIMG_MK", "TARGET_CUSTOM_DTBTOOL"})
+PATH_ASSIGNMENT = re.compile(r"^\\s*([A-Z][A-Z0-9_]*)\\s*(?::=|\\?=|=)\\s*(.*?)\\s*$")
+
+def configured_file_paths(text):
+    """Extract literal paths from allowlisted path-valued Make variables."""
+    paths = set()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0]
+        match = PATH_ASSIGNMENT.match(line)
+        if match and match.group(1) in PATH_VARIABLES:
+            paths.update(PATH_PATTERN.findall(match.group(2)))
+    return paths
+
+def all_file_dependencies(text):
+    """Direct includes/inherit-product plus explicit file-valued variables."""
+    return referenced_paths(text) | configured_file_paths(text)
+
+def unresolved_file_dependencies(text, available_paths):
+    return all_file_dependencies(text) - set(available_paths)
+
 def unresolved_paths(text, available_paths):
     return referenced_paths(text) - set(available_paths)
 
@@ -45,7 +66,7 @@ def main():
     args = parser.parse_args()
     available = {x.strip() for x in args.available_list.read_text().splitlines() if x.strip() and not x.startswith("#")}
     text = args.makefile.read_text()
-    for path in sorted(unresolved_paths(text, available)):
+    for path in sorted(unresolved_file_dependencies(text, available)):
         print("UNRESOLVED:", path)
     print("This static scan cannot establish Android 17 build compatibility.")
 
