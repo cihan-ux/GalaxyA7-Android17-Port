@@ -1,0 +1,29 @@
+name: Research manifest validation
+on:
+  push:
+    paths:
+      - 'manifests/**'
+      - 'tools/**'
+      - 'tests/**'
+      - '.github/workflows/research-validation.yml'
+  pull_request:
+    paths:
+      - 'manifests/**'
+      - 'tools/**'
+      - 'tests/**'
+      - '.github/workflows/research-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check research manifest
+        run: python3 tools/check_research_manifest.py
+      - name: Run offline tests
+        run: python3 -m unittest discover -s tests -v
