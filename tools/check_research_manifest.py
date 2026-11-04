@@ -11,6 +11,11 @@ EXPECTED = {
     "device/samsung/exynos7885-common": "device_samsung_exynos7885-common",
     "kernel/samsung/exynos7885": "kernel_samsung_exynos7885",
 }
+PINNED_REVISIONS = {
+    'device/samsung/a7y18lte': 'f17643ba01010c45b628d5acb8f48350ded61606',
+    'device/samsung/exynos7885-common': 'f2ce8d2093711026f021cba7036334d381d455ef',
+    'kernel/samsung/exynos7885': '6020dfa8315134187f07ca903c9d2ed7ee0256f5'
+}
 BLOCKERS = [
     "vendor/samsung/a7y18lte",
     "vendor/samsung/exynos7885-common",
@@ -36,7 +41,7 @@ def main() -> int:
         if match is None or match.get("name") != name:
             print(f"FAIL: missing or unexpected project at {path}")
             return 1
-        if match.get("revision") != "lineage-18.1":
+        if match.get("revision") != PINNED_REVISIONS[path]:
             print(f"FAIL: unexpected revision at {path}")
             return 1
     print("PASS: three known baseline projects mapped to expected paths.")
