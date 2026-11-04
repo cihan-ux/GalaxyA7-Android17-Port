@@ -2,6 +2,8 @@
 
 Research only. **No proprietary binary copied, downloaded, republished, or added to this repository.**
 
+Update: the [maintained SLSI source discovery](slsi-matching-source-discovery.md) supersedes the unresolved-in-this-organization finding below. Five matching-branch repositories have now been located; complete dependency and license validation remains open. The [source evidence audit](source-evidence-audit.md) records immutable Samsung hardware and vendor metadata observations.
+
 The `exynos7885-dev` organization exposes three additional public repositories on `lineage-18.1`:
 
 | Required local path | Upstream repository | Verified file/directory | Status |

@@ -1,34 +1,27 @@
-# Baseline source audit — 2026-11-05
+# Pinned baseline source audit — 2026-11-04 UTC
 
-Target hardware: **Samsung SM-A750F**, device `a7y18lte`, firmware `A750FXXU5CVG1` (user-reported AIDA64), Exynos 7885, arm64, Linux 4.4.177.
+The three pins in `manifests/lineage-18.1-research.xml` match the maintained repositories’ `lineage-18.1` branch heads observed during this audit. They are not the separate `old_device_*` source trees previously linked here. See the [checksummed source evidence](source-evidence-audit.md).
 
-## Inspected upstream (LineageOS 18.1)
-- Device: https://github.com/exynos7885-dev/old_device_samsung_a7y18lte/tree/lineage-18.1
-- Common device: https://github.com/exynos7885-dev/old_device_samsung_exynos7885-common/tree/lineage-18.1
-- `BoardConfig.mk` includes `device/samsung/exynos7885-common/BoardConfigCommon.mk`.
-- `device.mk` inherits `device/samsung/exynos7885-common/exynos7885.mk`.
-- `setup-makefiles.sh` delegates to common device vendor extraction setup.
-- Kernel defconfig requested: `lineage_a7y18lte_defconfig`; **matching kernel source/revision not yet validated**.
-- `lineage_a7y18lte.mk` sets `PRODUCT_SHIPPING_API_LEVEL := 26` and uses an **A750FNXXU5CVG2** build fingerprint. Target phone is **A750FXXU5CVG1**: do not assume compatibility or replace device identifiers without testing.
+| Project | Pinned commit | Source findings |
+|---|---|---|
+| `exynos7885-dev/device_samsung_a7y18lte` | `f17643ba01010c45b628d5acb8f48350ded61606` | Requests `lineage_a7y18lte_defconfig`; shipping API **28**; retrofit dynamic partition constants |
+| `exynos7885-dev/device_samsung_exynos7885-common` | `f2ce8d2093711026f021cba7036334d381d455ef` | Kernel path `kernel/samsung/exynos7885`; **Clang enabled**; custom Samsung boot Makefile and Linaro BSP |
+| `exynos7885-dev/kernel_samsung_exynos7885` | `6020dfa8315134187f07ca903c9d2ed7ee0256f5` | Requested defconfig exists; top-level Makefile declares **4.4.302** |
 
-## Partition sizes in the 18.1 device tree (bytes, not independently verified against this phone)
-| Image | Size |
-|---|---:|
-| boot | 33554432 |
-| recovery | 39845888 |
-| system | 4093640704 |
-| vendor | 419430400 |
-| odm | 369098752 |
-| cache | 262144000 |
+This corrects earlier claims about an unlocated defconfig, GCC 4.9, and shipping API 26. The previously recorded stock handset kernel, 4.4.177, is a different observation from the pinned kernel source version. Neither version proves a kernel build or boot.
 
-## Blocking unknowns
-1. Exact kernel repository and commit containing the requested defconfig.
-2. Common-device branch revision, proprietary blob provenance and vendor compatibility.
-3. Android 17 / LineageOS branch build support for legacy Linux 4.4 and HALs.
-4. SM-A750F-specific partition map, bootloader unlock status, recovery and stock restore path.
-5. Whether the historical 18.1 tree can reproduce a working ROM.
+The distinct historical `old_device_samsung_a7y18lte` and `old_device_samsung_exynos7885-common` `lineage-18.1` heads were observed as `ac19e6b0a55b502e2d3ecb2f0388b8c139ca922f` and `8bd541011ccfdd3f79d4cf15158fe21fa8e242ff`. Do not combine their facts with the maintained pins merely because the branch names agree.
 
-## Next engineering task
-Trace common `BoardConfigCommon.mk`, kernel path, `exynos7885.mk`, extraction lists and HAL declarations. Prepare a dependency inventory before writing an Android 17 local manifest.
+## Partition declarations
 
-**No ROM, kernel or recovery image has been built or tested. Do not flash anything from this repository.**
+The device BoardConfig declares physical `SYSTEM`, `VENDOR`, and `ODM` sizes of 4,093,640,704, 419,430,400, and 369,098,752 bytes. Their sum is 4,882,169,856 bytes, with a dynamic group size of 4,878,169,856 bytes. Boot, recovery, and cache sizes are 33,554,432, 39,845,888, and 262,144,000 bytes. The common BoardConfig enables a metadata partition. These are source declarations, not measurements of SM-A750F/U5. See the [partition audit](pinned-partition-source-audit.md).
+
+## Remaining blockers
+
+1. Complete revision-specific platform, Samsung hardware, split SLSI and vendor dependency inventory.
+2. SM-A750F firmware provenance and SKU differences; NFC-specific entries name SM-A750FN and SM-A750GN.
+3. Reproducible baseline source checkout, kernel/toolchain build, and ROM build.
+4. Android 17 kernel, HAL/VINTF, build-system and SELinux compatibility tests against an exact target checkout.
+5. Independent SM-A750F partition/recovery evidence, outside this source-only task.
+
+No phone access, ROM/kernel build, image validation, or flashing was performed.

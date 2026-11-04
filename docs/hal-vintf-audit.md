@@ -1,10 +1,12 @@
-# HAL and VINTF compatibility audit — 2026-11-05
+# HAL and VINTF compatibility audit — reviewed 2026-11-04 UTC
 
 Sources:
-- [Current common VINTF manifest](https://github.com/exynos7885-dev/device_samsung_exynos7885-common/blob/lineage-18.1/manifest.xml)
-- [Current device VINTF manifest](https://github.com/exynos7885-dev/device_samsung_a7y18lte/blob/lineage-18.1/manifest.xml)
-- [Current common product makefile](https://github.com/exynos7885-dev/device_samsung_exynos7885-common/blob/lineage-18.1/exynos7885.mk)
-- [Current device product makefile](https://github.com/exynos7885-dev/device_samsung_a7y18lte/blob/lineage-18.1/device.mk)
+- [Pinned common VINTF manifest](https://github.com/exynos7885-dev/device_samsung_exynos7885-common/blob/f2ce8d2093711026f021cba7036334d381d455ef/manifest.xml)
+- [Pinned device VINTF manifest](https://github.com/exynos7885-dev/device_samsung_a7y18lte/blob/f17643ba01010c45b628d5acb8f48350ded61606/manifest.xml)
+- [Pinned common product makefile](https://github.com/exynos7885-dev/device_samsung_exynos7885-common/blob/f2ce8d2093711026f021cba7036334d381d455ef/exynos7885.mk)
+- [Pinned device product makefile](https://github.com/exynos7885-dev/device_samsung_a7y18lte/blob/f17643ba01010c45b628d5acb8f48350ded61606/device.mk)
+
+These complete XML/Makefile files are retained as [checksummed source evidence](source-evidence-audit.md). They are inputs to a future assembled-manifest check; static inspection does not perform VINTF compatibility validation.
 
 ## Confirmed baseline declarations (not Android 17 compatibility claims)
 

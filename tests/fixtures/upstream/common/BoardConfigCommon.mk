@@ -1,0 +1,169 @@
+#
+# Copyright (C) 2025 The LineageOS Project
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+## Common Path
+COMMON_PATH := device/samsung/exynos7885-common
+
+# Arch
+TARGET_ARCH := arm64
+TARGET_ARCH_VARIANT := armv8-a
+TARGET_CPU_ABI := arm64-v8a
+TARGET_CPU_VARIANT := cortex-a73
+
+TARGET_2ND_ARCH := arm
+TARGET_2ND_ARCH_VARIANT := armv8-a
+TARGET_2ND_CPU_ABI := armeabi-v7a
+TARGET_2ND_CPU_ABI2 := armeabi
+TARGET_2ND_CPU_VARIANT := cortex-a53
+
+# Bluetooth
+BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(COMMON_PATH)/bluetooth
+BOARD_HAVE_BLUETOOTH_SLSI := true
+
+# Bootloader
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+TARGET_BOOTLOADER_BOARD_NAME := exynos7884
+else
+TARGET_BOOTLOADER_BOARD_NAME := exynos7885
+endif
+
+# BSP
+BOARD_USES_DT := true
+TARGET_SLSI_VARIANT := linaro
+include hardware/samsung_slsi-linaro/config/BoardConfig7885.mk
+
+# Build
+BUILD_BROKEN_DUP_RULES := true
+
+# DTBO
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+BOARD_KERNEL_SEPARATED_DTBO := true
+BOARD_DTBO_CFG := $(COMMON_PATH)/configs/kernel/$(TARGET_DEVICE).cfg
+endif
+
+# Filesystem
+BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE := ext4
+BOARD_ODMIMAGE_FILE_SYSTEM_TYPE := ext4
+BOARD_PRODUCTIMAGE_FILE_SYSTEM_TYPE := ext4
+BOARD_SYSTEM_EXTIMAGE_FILE_SYSTEM_TYPE := ext4
+BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
+TARGET_COPY_OUT_ODM := odm
+TARGET_COPY_OUT_PRODUCT := product
+TARGET_COPY_OUT_SYSTEM_EXT := system_ext
+TARGET_COPY_OUT_VENDOR := vendor
+TARGET_USERIMAGES_USE_EXT4 := true
+TARGET_USERIMAGES_USE_F2FS := true
+
+# Headers
+TARGET_SPECIFIC_HEADER_PATH := $(COMMON_PATH)/include
+
+# Init
+TARGET_INIT_VENDOR_LIB := //$(COMMON_PATH):libinit_exynos7885
+
+# Kernel
+BOARD_KERNEL_BASE := 0x10000000
+BOARD_KERNEL_IMAGE_NAME := Image
+BOARD_KERNEL_PAGESIZE := 2048
+BOARD_MKBOOTIMG_ARGS := --kernel_offset 0x00008000 --ramdisk_offset 0x01000000 --second_offset 0x00f00000 --tags_offset 0x00000100
+
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+BOARD_MKBOOTIMG_ARGS += --header_version 1
+else
+BOARD_CUSTOM_BOOTIMG := true
+BOARD_CUSTOM_BOOTIMG_MK := hardware/samsung/mkbootimg.mk
+BOARD_KERNEL_SEPARATED_DT := true
+TARGET_CUSTOM_DTBTOOL := dtbhtoolExynos
+endif
+
+# Kernel Source
+TARGET_KERNEL_SOURCE := kernel/samsung/exynos7885
+
+# Kernel Toolchain
+TARGET_KERNEL_CLANG_COMPILE := true
+
+# Metadata
+BOARD_USES_METADATA_PARTITION := true
+
+# Partitions
+BOARD_SUPER_PARTITION_GROUPS := samsung_dynamic_partitions
+BOARD_SAMSUNG_DYNAMIC_PARTITIONS_PARTITION_LIST := odm product system system_ext vendor
+
+ifneq ($(WITH_GMS),true)
+BOARD_PRODUCTIMAGE_PARTITION_RESERVED_SIZE := 629145600
+BOARD_PRODUCTIMAGE_EXTFS_INODE_COUNT := -1
+BOARD_SYSTEMIMAGE_PARTITION_RESERVED_SIZE := 629145600
+BOARD_SYSTEMIMAGE_EXTFS_INODE_COUNT := -1
+BOARD_SYSTEM_EXTIMAGE_PARTITION_RESERVED_SIZE := 629145600
+BOARD_SYSTEM_EXTIMAGE_EXTFS_INODE_COUNT := -1
+endif
+
+BOARD_FLASH_BLOCK_SIZE := 4096
+
+# Platform
+BOARD_VENDOR := samsung
+
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+TARGET_BOARD_PLATFORM := exynos7884
+else
+TARGET_BOARD_PLATFORM := exynos7885
+endif
+
+# Props
+TARGET_PRODUCT_PROP += $(COMMON_PATH)/product.prop
+TARGET_VENDOR_PROP += $(COMMON_PATH)/vendor.prop
+
+# Recovery
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+BOARD_INCLUDE_RECOVERY_DTBO := true
+endif
+
+TARGET_RECOVERY_FSTAB := $(COMMON_PATH)/configs/init/fstab.$(TARGET_BOOTLOADER_BOARD_NAME)
+TARGET_RECOVERY_UPDATER_LIBS := librecovery_updater_exynos7885
+
+# Releasetools
+TARGET_RELEASETOOLS_EXTENSIONS := $(COMMON_PATH)/releasetools
+
+# RIL
+BOARD_PROVIDES_LIBRIL := true
+ENABLE_VENDOR_RIL_SERVICE := true
+
+# Root
+BOARD_ROOT_EXTRA_FOLDERS := efs
+
+# SELinux
+BOARD_SEPOLICY_TEE_FLAVOR := mobicore
+BOARD_VENDOR_SEPOLICY_DIRS += $(COMMON_PATH)/sepolicy/vendor
+include device/lineage/sepolicy/exynos/sepolicy.mk
+include device/samsung_slsi/sepolicy/sepolicy.mk
+
+# Verified Boot
+ifneq ($(filter xcover4s, $(TARGET_DEVICE)),)
+BOARD_AVB_ENABLE := true
+BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS += --include_descriptors_from_image $(PRODUCT_OUT)/dt.img
+BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS += --flags 3
+BOARD_AVB_ROLLBACK_INDEX := $(PLATFORM_SECURITY_PATCH_TIMESTAMP)
+BOARD_AVB_RECOVERY_ALGORITHM := SHA256_RSA4096
+BOARD_AVB_RECOVERY_KEY_PATH := external/avb/test/data/testkey_rsa4096.pem
+BOARD_AVB_RECOVERY_ROLLBACK_INDEX := 1
+BOARD_AVB_RECOVERY_ROLLBACK_INDEX_LOCATION := 1
+endif
+
+# Vendor
+VENDOR_SECURITY_PATCH := 2022-09-01 # G398FNXXSJCWF1
+
+# Vintf
+DEVICE_MANIFEST_FILE += $(COMMON_PATH)/manifest.xml
+DEVICE_MATRIX_FILE := $(COMMON_PATH)/compatibility_matrix.xml
+
+# Wifi
+BOARD_HOSTAPD_DRIVER := NL80211
+BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_slsi
+BOARD_WLAN_DEVICE := slsi
+BOARD_WPA_SUPPLICANT_DRIVER := NL80211
+BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_slsi
+WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
+WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
+WPA_SUPPLICANT_VERSION := VER_0_8_X

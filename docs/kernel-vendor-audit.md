@@ -1,29 +1,20 @@
-# Kernel and vendor dependency audit — 2026-11-05
+# Kernel and vendor dependency audit — 2026-11-04 UTC
 
-## Confirmed from LineageOS 18.1 sources
+The [source evidence audit](source-evidence-audit.md) records complete source fixtures from the three manifest pins. Earlier notes here described separate `old_device_*` trees; those facts did not describe the pinned maintained baseline.
 
-- Device tree: https://github.com/exynos7885-dev/old_device_samsung_a7y18lte/tree/lineage-18.1
-- Common tree: https://github.com/exynos7885-dev/old_device_samsung_exynos7885-common/tree/lineage-18.1
-- Common BoardConfig sets `TARGET_KERNEL_SOURCE := kernel/samsung/exynos7885`.
-- Device BoardConfig requests `TARGET_KERNEL_CONFIG := lineage_a7y18lte_defconfig`.
-- Common BoardConfig uses `BOARD_CUSTOM_BOOTIMG := true`, Samsung `hardware/samsung/mkbootimg.mk`, `Image`, separate DT and `dtbhtoolExynos`.
-- Historical kernel build uses GCC 4.9 (`TARGET_KERNEL_CLANG_COMPILE := false`), not a modern Clang-first configuration.
-- Common product file inherits `vendor/samsung/exynos7885-common/exynos7885-common-vendor.mk` — proprietary vendor extraction is a separate dependency.
-- The historical common tree configures audio HIDL 4.0, camera provider 2.5, graphics allocator 2.0, graphics composer 2.1, fingerprint 2.1, radio 1.4 and keymaster 3.0. These are **legacy interface versions**; Android 17 compatibility has not been verified.
-- Proprietary extraction script contains binary fixes for audio, camera, sensor and NFC components, indicating vendor compatibility work already existed on Android 11.
+## Verified at the pins
 
-## Kernel candidate check
+- Device `BoardConfig.mk` requests `lineage_a7y18lte_defconfig`, which exists at `arch/arm64/configs/lineage_a7y18lte_defconfig` in kernel commit `6020dfa8315134187f07ca903c9d2ed7ee0256f5`.
+- The kernel Makefile declares `VERSION = 4`, `PATCHLEVEL = 4`, `SUBLEVEL = 302`. This is a source version, not the previously recorded stock phone kernel 4.4.177 or a newly built artifact.
+- Common `BoardConfigCommon.mk` points to `kernel/samsung/exynos7885` and sets `TARGET_KERNEL_CLANG_COMPILE := true`. The previous GCC-only claim is superseded. A working compiler revision is still unverified.
+- For A7, the common source selects `BOARD_CUSTOM_BOOTIMG := true`, `hardware/samsung/mkbootimg.mk`, `Image`, separated DT, and the **module name** `dtbhtoolExynos`. The latter is not a literal filesystem path.
+- Both device and common product files inherit vendor makefiles outside the three-project manifest. Public availability of a vendor repository establishes neither firmware provenance nor redistribution rights.
+- Pinned VINTF XML declares audio HIDL 4.0, camera provider 2.5, graphics allocator 2.0, graphics composer **2.4**, fingerprint 2.1, radio 1.4 and keymaster 3.0. Both manifests use target level 3. These declarations need comparison with the complete assembled vendor manifests and target framework matrices.
 
-Candidate: https://github.com/AKSharma87/android_kernel_samsung_a7y18lte (branch `wip`).
+## Still unverified
 
-The expected path `arch/arm64/configs/lineage_a7y18lte_defconfig` returned 404 on that branch. **This does not prove the kernel is unsuitable**: the defconfig could live elsewhere or another branch. Do not write a manifest pointing to this kernel until its exact defconfig and buildability are verified.
+The matching Samsung boot tooling, split SLSI BSP, toolchain, generated DT inputs, firmware-specific extraction outputs, and source checkout must be resolved before attempting a baseline build. A defconfig’s existence is necessary evidence, but does not establish compilation or hardware support. The [Android 17 source comparison](android17-source-compatibility.md) records separate forward-port questions.
 
-## Next validation
+The experimental AKSharma87 kernel previously linked here is an alternative lead, not the manifest kernel. Its missing defconfig on one branch does not block locating the requested file in the actual pinned kernel.
 
-1. Search common/kernel organization for a kernel repository with matching `lineage_a7y18lte_defconfig`.
-2. Inspect branch and tree availability; record commit SHA rather than floating branch for reproducibility.
-3. Identify extraction sources and required Samsung stock firmware version without committing proprietary binaries.
-4. Compare old HIDL and VINTF declarations with the actual Android 17 build requirements.
-5. Do not change the device, unlock the bootloader or flash experimental images.
-
-**Status: dependency research, no ROM build, no device tests.**
+No proprietary binaries were downloaded or distributed; no device was accessed.

@@ -4,14 +4,14 @@ This tracker separates verified source preparation from device and build validat
 
 | Gate | Status | Evidence / unblock requirement |
 |---|---|---|
-| G0: Source provenance | PASS (research only) | Three LineageOS 18.1 projects pinned to commit hashes |
+| G0: Source provenance | PARTIAL | Three LineageOS 18.1 projects pinned; checksummed source evidence added; vendor provenance and full dependency closure unresolved |
 | G1: Manifest structure | PASS (research only) | GitHub Actions offline tests |
 | G2: Partition arithmetic | PASS (source arithmetic only) | Super sum and reserve validated, not device topology |
 | G3: Exact SM-A750F partition topology | BLOCKED | Read-only device-specific partition layout evidence needed |
 | G4: SM-A750F vendor provenance | BLOCKED | Upstream A750FN blob list differs from A750F stock build |
-| G5: Complete historical BSP dependencies | BLOCKED | Vendor trees, Samsung SLSI and boot tooling unresolved |
+| G5: Complete historical BSP dependencies | BLOCKED | Vendor trees, Samsung SLSI and complete boot tooling dependencies unresolved; candidate existence is insufficient |
 | G6: Reproducible historical baseline build | NOT STARTED | G3–G5 must be addressed first |
-| G7: Android 17 API/HAL/VINTF/SELinux port | NOT STARTED | No compatible target implementation verified |
+| G7: Android 17 API/HAL/VINTF/SELinux port | SOURCE AUDIT ONLY | Exact LineageOS 24 source comparison documented; target FCM/SELinux/kernel path unresolved; no compatible implementation verified |
 | G8: Boot/recovery validation | NOT STARTED | Requires backups, safe recovery plan and explicit user approval |
 
 ## Next highest-value actions
