@@ -30,7 +30,7 @@ class ResearchManifestTests(unittest.TestCase):
             self.assertEqual(paths[path].get("revision"), PINNED_REVISIONS[path])
 
     def test_not_misrepresented_as_android17(self):
-        self.assertFalse(any("17" in (p.get("revision") or "") for p in self.projects))
+        self.assertTrue(all(p.get("revision") == PINNED_REVISIONS[p.get("path")] for p in self.projects))
 
     def test_unresolved_dependencies_not_claimed(self):
         paths = {p.get("path") for p in self.projects}
