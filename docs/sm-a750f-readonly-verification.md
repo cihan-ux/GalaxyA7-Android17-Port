@@ -53,3 +53,13 @@ ro.build.version.sdk=29
 ```
 
 Run `python3 tools/check_device_report.py report.txt`. The tool does not contact the phone, access the network or validate partition layout. **Do not paste full `adb shell getprop` output** into this file; it may include identifiers.
+
+## Optional partition-name inventory
+
+If you already have a **sanitized list of partition names**, place only the names in a local text file, one per line (for example, `boot`, `recovery`, `system`, `vendor`). Do not include block paths, serial numbers, partition dumps or sizes. Run:
+
+```sh
+python3 tools/check_partition_names.py partition-names.txt
+```
+
+The checker reports absent names and hints such as `super`; these are **not** evidence that dynamic partitions are correctly configured or safe to flash. Actual on-device topology remains unverified.
