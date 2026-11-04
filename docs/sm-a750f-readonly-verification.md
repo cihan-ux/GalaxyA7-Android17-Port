@@ -40,3 +40,16 @@ Share only model, Android version, build ID and **partition names** if comfortab
 ## Engineering follow-up
 
 Use collected *non-sensitive* facts to compare `BoardConfig.mk`, partition layout and vendor extraction baseline. These commands **do not validate Android 17 compatibility**.
+
+## Optional offline report checker
+
+Create a local text file containing only allowlisted keys, for example:
+
+```ini
+ro.product.model=SM-A750F
+ro.product.device=a7y18lte
+ro.build.version.release=10
+ro.build.version.sdk=29
+```
+
+Run `python3 tools/check_device_report.py report.txt`. The tool does not contact the phone, access the network or validate partition layout. **Do not paste full `adb shell getprop` output** into this file; it may include identifiers.
