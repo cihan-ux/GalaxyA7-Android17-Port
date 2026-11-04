@@ -10,10 +10,9 @@ PATH_PATTERN = re.compile(r"(?:hardware|device|vendor)/[A-Za-z0-9_.+-]+(?:/[A-Za
 MAKE_DIRECTIVES = re.compile(r"^\s*(?:include\s+|[-]?include\s+|\$\(call\s+inherit-product(?:-if-exists)?,)", re.M)
 REQUIRED_LINARO = frozenset({
     "hardware/samsung_slsi-linaro/config/BoardConfig7885.mk",
-    "hardware/samsung/mkbootimg.mk",
+    "device/samsung_slsi/sepolicy/sepolicy.mk",
 })
 REQUIRED_BSP = frozenset({
-    "hardware/samsung/mkbootimg.mk",
     "device/samsung_slsi/sepolicy/sepolicy.mk",
 })
 
