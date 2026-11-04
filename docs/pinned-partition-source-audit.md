@@ -20,3 +20,7 @@ The common tree declares logical dynamic partitions `odm product system system_e
 5. Confirm independently tested recovery and complete user backup before any device-changing operation.
 
 **No repartitioning, OEM unlock, root, flash or data wipe is authorized by this audit.**
+
+## Reproducible offline arithmetic
+
+Run `python3 tools/audit_partition_arithmetic.py` to verify the source-level physical partition sum and 4,000,000-byte group reserve. Its seven unit tests cover incorrect totals, oversized groups, invalid sizes and the explicit lack of on-device verification. This does **not** establish that the phone's GPT or logical partition metadata matches the source constants.
