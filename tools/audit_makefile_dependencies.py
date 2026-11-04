@@ -16,6 +16,10 @@ REQUIRED_BSP = frozenset({
     "device/samsung_slsi/sepolicy/sepolicy.mk",
 })
 
+def declared_slsi_variant(text):
+    match = re.search(r"^\\s*TARGET_SLSI_VARIANT\\s*:?=\\s*(linaro|bsp)\\s*(?:#.*)?$", text, re.M)
+    return match.group(1) if match else None
+
 def referenced_paths(text):
     if not isinstance(text, str):
         raise TypeError("Makefile source must be text")
