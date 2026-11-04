@@ -7,3 +7,7 @@ A historical [ivanmeler/roomservice.xml](https://github.com/ivanmeler/local_mani
 Another [ProjectElixir Samsung p3s vendorsetup](https://github.com/ProjectElixir-Devices/android_device_samsung_p3s/blob/elixir/vendorsetup.sh) uses Exynos2100-common sources across mixed branches `14` and `lineage-21`. **Do not run this script:** it includes destructive `rm -rf` operations, fetches unrelated hardware branches, and does not validate the A7.
 
 **Decision:** Keep `hardware/samsung_slsi-linaro/{config,exynos,exynos5,graphics,interfaces,openmax}` as unresolved for a *matching* historical baseline. No public lead above proves SM-A750F, Exynos7885 or Android17 compatibility. Do not add candidate repos to the manifest until exact commits, file licenses and dependency interfaces are verified. Never copy proprietary vendor blobs into this public repository.
+
+## Repository existence verification
+
+GitHub repository metadata confirms that `8890q/android_hardware_samsung_slsi-linaro_{config,exynos,exynos5,graphics,openmax}` are public repository names; their **current default branches** are `lineage-20`, not proof that the historical `lineage-19.1` revisions remain available. The `8890q/..._interfaces` lookup returned 404. License metadata was not resolved for these repositories. This is an incomplete candidate set, and **no repository has been promoted to a build dependency**.
