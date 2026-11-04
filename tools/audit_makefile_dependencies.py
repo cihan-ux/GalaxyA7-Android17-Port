@@ -48,6 +48,24 @@ def all_file_dependencies(text):
     """Direct includes/inherit-product plus explicit file-valued variables."""
     return referenced_paths(text) | configured_file_paths(text)
 
+
+# Paths with Make variable expansion cannot be resolved without a build environment.
+MAKE_VARIABLE = re.compile(r"\$\((?:[A-Za-z_][A-Za-z0-9_]*|call\b[^)]*)\)|\$\{[^}]+\}")
+
+def dynamic_dependency_lines(text):
+    """Return line numbers of unresolved dynamic include/inherit/file-variable expressions."""
+    result = []
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = raw.split("#", 1)[0]
+        assignment = PATH_ASSIGNMENT.match(line)
+        is_path_assignment = bool(assignment and assignment.group(1) in PATH_VARIABLES)
+        if (MAKE_DIRECTIVES.match(line) or is_path_assignment) and MAKE_VARIABLE.search(line):
+            # The inherit-product call itself is syntax, not an unresolved variable.
+            without_calls = re.sub(r"\$\(call\s+inherit-product(?:-if-exists)?,", "", line)
+            if MAKE_VARIABLE.search(without_calls):
+                result.append(number)
+    return result
+
 def unresolved_file_dependencies(text, available_paths):
     return all_file_dependencies(text) - set(available_paths)
 
@@ -68,6 +86,8 @@ def main():
     text = args.makefile.read_text()
     for path in sorted(unresolved_file_dependencies(text, available)):
         print("UNRESOLVED:", path)
+    for line_number in dynamic_dependency_lines(text):
+        print("DYNAMIC_REVIEW_REQUIRED: line", line_number)
     print("This static scan cannot establish Android 17 build compatibility.")
 
 if __name__ == "__main__":
