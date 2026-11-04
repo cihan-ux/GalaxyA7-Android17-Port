@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from audit_makefile_dependencies import referenced_paths, unresolved_paths, source_gate, REQUIRED_LINARO, REQUIRED_BSP
+from audit_makefile_dependencies import referenced_paths, unresolved_paths, source_gate, REQUIRED_LINARO, REQUIRED_BSP, declared_slsi_variant
 
 class MakefileDependencyTests(unittest.TestCase):
     def test_linaro_board_include(self):
