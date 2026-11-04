@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Research-only dependency manifest for LineageOS 18.1, NOT Android 17. -->
-<!-- Requires a compatible LineageOS 18.1 source checkout and additional BSP/vendor projects. -->
+<!-- Pinned research-only baseline: NOT a complete LineageOS build manifest and NOT Android 17. -->
 <manifest>
   <remote name="exynos7885-dev" fetch="https://github.com/exynos7885-dev/" />
-  <project name="device_samsung_a7y18lte" path="device/samsung/a7y18lte" remote="exynos7885-dev" revision="lineage-18.1" />
-  <project name="device_samsung_exynos7885-common" path="device/samsung/exynos7885-common" remote="exynos7885-dev" revision="lineage-18.1" />
-  <project name="kernel_samsung_exynos7885" path="kernel/samsung/exynos7885" remote="exynos7885-dev" revision="lineage-18.1" />
+  <project name="device_samsung_a7y18lte" path="device/samsung/a7y18lte" remote="exynos7885-dev" revision="f17643ba01010c45b628d5acb8f48350ded61606" />
+  <project name="device_samsung_exynos7885-common" path="device/samsung/exynos7885-common" remote="exynos7885-dev" revision="f2ce8d2093711026f021cba7036334d381d455ef" />
+  <project name="kernel_samsung_exynos7885" path="kernel/samsung/exynos7885" remote="exynos7885-dev" revision="6020dfa8315134187f07ca903c9d2ed7ee0256f5" />
 </manifest>
