@@ -32,7 +32,7 @@ def referenced_paths(text):
 
 # Only known path-bearing Make variables; arbitrary assignments are not dependencies.
 PATH_VARIABLES = frozenset({"BOARD_CUSTOM_BOOTIMG_MK", "TARGET_CUSTOM_DTBTOOL"})
-PATH_ASSIGNMENT = re.compile(r"^\\s*([A-Z][A-Z0-9_]*)\\s*(?::=|\\?=|=)\\s*(.*?)\\s*$")
+PATH_ASSIGNMENT = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*(?::=|\?=|=)\s*(.*?)\s*$")
 
 def configured_file_paths(text):
     """Extract literal paths from allowlisted path-valued Make variables."""
