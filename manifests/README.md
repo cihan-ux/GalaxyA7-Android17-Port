@@ -1,3 +1,5 @@
-# Local manifests
+# Local manifests — research only
 
-No local manifest is published yet. Dependency repositories and compatible revisions must be verified first. Do not assume that an Android 11 device tree can be used unchanged on Android 17.
+`lineage-18.1-research.xml` maps the three verified, matching **newer** Exynos7885 device/common/kernel repositories. It is not a complete source manifest, not pinned to commits, and **cannot by itself build Android 17**.
+
+Never flash an image based solely on this manifest. The newer device tree includes dynamic partition configuration that requires a separate device-specific safety assessment.
