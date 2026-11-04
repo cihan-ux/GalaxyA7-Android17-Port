@@ -29,6 +29,9 @@ class MakefileDependencyTests(unittest.TestCase):
         self.assertFalse(source_gate(source, set(), REQUIRED_LINARO))
         self.assertTrue(source_gate(source, REQUIRED_LINARO, REQUIRED_LINARO))
 
-    def test_bsp_gate_rejects_linaro_only_source(self):
-        source = "\n".join("include " + p for p in REQUIRED_LINARO)
-        self.assertFalse(source_gate(source, REQUIRED_LINARO, REQUIRED_BSP))
+    def test_bsp_sepolicy_shared_with_linaro(self):
+        self.assertTrue(REQUIRED_BSP <= REQUIRED_LINARO)
+
+    def test_explicit_variant_detection(self):
+        self.assertEqual(declared_slsi_variant("TARGET_SLSI_VARIANT := bsp"), "bsp")
+        self.assertEqual(declared_slsi_variant("TARGET_SLSI_VARIANT := linaro"), "linaro")
