@@ -41,3 +41,7 @@ Evidence:
 5. For Android 17, separately address kernel 4.4, HIDL/VINTF, SELinux, graphics and vendor API compatibility.
 
 **A successful XML/unit test run does not satisfy any of these build gates.**
+
+## Discovery update (2026-11-05)
+
+Three repository candidates have since been **located** under `exynos7885-dev`: `hardware_samsung`, `proprietary_vendor_samsung_a7y18lte`, and `proprietary_vendor_samsung_exynos7885-common` (all expose a `lineage-18.1` branch and expected top-level files). See [upstream-repository-discovery.md](upstream-repository-discovery.md). Their existence reduces *discovery uncertainty*, **not** the build blockers: matching revisions, licensing, SM-A750F firmware provenance, and compatibility are still unverified. Do not add proprietary blobs to this public repository. The SLSI BSP dependency remains unresolved.
