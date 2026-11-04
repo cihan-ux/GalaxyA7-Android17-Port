@@ -2,6 +2,7 @@
 """Read-only structural audit of the research manifest. No Android build or flashing."""
 from pathlib import Path
 import sys
+import re
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,10 @@ def main() -> int:
     if root.tag != "manifest":
         print("FAIL: expected <manifest> root")
         return 1
+    remotes = {r.get("name"): r.get("fetch") for r in root.findall("remote")}
+    if remotes.get("exynos7885-dev") != "https://github.com/exynos7885-dev/":
+        print("FAIL: unexpected remote URL")
+        return 1
     projects = root.findall("project")
     paths = [p.get("path") for p in projects]
     if len(paths) != len(set(paths)):
@@ -41,10 +46,19 @@ def main() -> int:
         if match is None or match.get("name") != name:
             print(f"FAIL: missing or unexpected project at {path}")
             return 1
+        if match.get("remote") != "exynos7885-dev":
+            print(f"FAIL: unexpected remote at {path}")
+            return 1
+        if not re.fullmatch(r"[0-9a-f]{40}", match.get("revision") or ""):
+            print(f"FAIL: invalid pinned SHA at {path}")
+            return 1
         if match.get("revision") != PINNED_REVISIONS[path]:
             print(f"FAIL: unexpected revision at {path}")
             return 1
-    print("PASS: three known baseline projects mapped to expected paths.")
+    if len(projects) != len(EXPECTED):
+        print("FAIL: unexpected additional projects")
+        return 1
+    print("PASS: three known baseline projects pinned to verified SHA revisions.")
     for path in BLOCKERS:
         print(f"BLOCKED: unresolved external dependency: {path}")
     print("RESEARCH ONLY: not a complete build manifest or Android 17 ROM.")
