@@ -15,6 +15,14 @@ class ResearchManifestTests(unittest.TestCase):
         cls.root = ET.parse(MANIFEST).getroot()
         cls.projects = cls.root.findall("project")
 
+    def test_pinned_project_count(self):
+        self.assertEqual(len(self.projects), len(EXPECTED))
+
+    def test_remote_is_expected(self):
+        remotes = {r.get("name"): r.get("fetch") for r in self.root.findall("remote")}
+        self.assertEqual(remotes.get("exynos7885-dev"), "https://github.com/exynos7885-dev/")
+        self.assertTrue(all(p.get("remote") == "exynos7885-dev" for p in self.projects))
+
     def test_xml_root(self):
         self.assertEqual(self.root.tag, "manifest")
 
