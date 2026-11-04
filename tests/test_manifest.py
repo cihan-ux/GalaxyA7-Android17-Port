@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from check_research_manifest import EXPECTED, MANIFEST, BLOCKERS
+from check_research_manifest import EXPECTED, MANIFEST, BLOCKERS, PINNED_REVISIONS
 
 
 class ResearchManifestTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class ResearchManifestTests(unittest.TestCase):
         for path, name in EXPECTED.items():
             self.assertIn(path, paths)
             self.assertEqual(paths[path].get("name"), name)
-            self.assertEqual(paths[path].get("revision"), "lineage-18.1")
+            self.assertEqual(paths[path].get("revision"), PINNED_REVISIONS[path])
 
     def test_not_misrepresented_as_android17(self):
         self.assertFalse(any("17" in (p.get("revision") or "") for p in self.projects))
