@@ -1,0 +1,9 @@
+*.img
+*.img.xz
+*.zip
+!README.md
+out/
+.cache/
+*.log
+*.key
+*.pem
