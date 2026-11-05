@@ -10,7 +10,7 @@ permissions:
 jobs:
   configure:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install repo and prerequisites
@@ -92,7 +92,7 @@ jobs:
             source build/envsetup.sh
             lunch lineage_a7y18lte-userdebug
             test -x build/soong/soong_ui.bash
-            timeout 600 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
+            timeout 420 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
           ) > "$GITHUB_WORKSPACE/evidence/soong-config.log" 2>&1
           status=$?
           set -e
