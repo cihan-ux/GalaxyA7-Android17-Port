@@ -57,22 +57,32 @@ jobs:
           grep -qx 'CONFIG_ANON_INODES=y' kernel-out/.config
           grep -qx 'CONFIG_SECURITY_SELINUX=y' kernel-out/.config
           cp kernel-out/.config probe-logs/arm64-bpf-enabled.config
-      - name: Compile real kernel BPF syscall ARM64 object
+      - name: Compile complete configured BPF object group for ARM64
         shell: bash
         run: |
           set -euo pipefail
           set -o pipefail
-          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion kernel/bpf/syscall.o 2>&1 | tee probe-logs/build.log
-          test -s kernel-out/kernel/bpf/syscall.o
-          readelf -h kernel-out/kernel/bpf/syscall.o | tee probe-logs/elf-header.txt
-          readelf -h kernel-out/kernel/bpf/syscall.o | grep -q 'AArch64'
-          sha256sum kernel-out/kernel/bpf/syscall.o | tee probe-logs/sha256.txt
-      - name: Preserve compiled ARM64 BPF object (not flashable)
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion kernel/bpf/built-in.o 2>&1 | tee probe-logs/build.log
+          for object in core syscall verifier inode helpers hashtab arraymap built-in; do
+            test -s "kernel-out/kernel/bpf/$object.o"
+            readelf -h "kernel-out/kernel/bpf/$object.o" | grep -q 'AArch64'
+          done
+          readelf -h kernel-out/kernel/bpf/built-in.o | tee probe-logs/elf-header.txt
+          sha256sum kernel-out/kernel/bpf/{core,syscall,verifier,inode,helpers,hashtab,arraymap,built-in}.o | tee probe-logs/sha256.txt
+      - name: Preserve compiled ARM64 BPF objects (not flashable)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: exynos7885-arm64-bpf-syscall-object-not-flashable
-          path: kernel-out/kernel/bpf/syscall.o
+          name: exynos7885-arm64-bpf-object-group-not-flashable
+          path: |
+            kernel-out/kernel/bpf/core.o
+            kernel-out/kernel/bpf/syscall.o
+            kernel-out/kernel/bpf/verifier.o
+            kernel-out/kernel/bpf/inode.o
+            kernel-out/kernel/bpf/helpers.o
+            kernel-out/kernel/bpf/hashtab.o
+            kernel-out/kernel/bpf/arraymap.o
+            kernel-out/kernel/bpf/built-in.o
           if-no-files-found: error
           retention-days: 7
       - name: Preserve evidence, including failure logs
