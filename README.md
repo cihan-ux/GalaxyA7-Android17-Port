@@ -12,6 +12,19 @@ Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Previously recorded
 - [Device recovery/GSI notes](https://github.com/Hari-Pi/a7y18lte-Resources)
 - [LineageOS upstream](https://github.com/LineageOS/android)
 
+## Android 17 staged product source (experimental)
+
+The first LineageOS 24.0 **device-tree source delta** is under
+[`port/lineage-24.0/device/samsung/a7y18lte/`](port/lineage-24.0/device/samsung/a7y18lte/).
+It stages a release-aware Android 17 product/lunch definition and the
+SM-A750F's Android 8 (API 26) original shipping level. The older device tree
+uses API 28; vendor compatibility with the corrected setting remains
+**unverified**. See the [port notes](docs/android17-product-stage.md) and
+run `python3 tools/check_android17_product_port.py` for a fast offline check.
+
+This **does not** produce a complete, buildable or flashable Android 17 ROM.
+Kernel 4.4.302, FCM 3, vendor provenance and SELinux forward-port gaps remain.
+
 ## Milestones
 1. Audit device, common device, kernel, vendor trees, branches and licenses.
 2. Verify a working baseline and collect hardware functionality reports.
