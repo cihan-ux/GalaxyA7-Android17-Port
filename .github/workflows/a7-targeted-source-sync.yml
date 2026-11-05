@@ -52,11 +52,24 @@ jobs:
           tail -n 100 "$GITHUB_WORKSPACE/evidence/targeted-sync.log"
           printf 'sync_exit=%s\n' "$status" > "$GITHUB_WORKSPACE/evidence/targeted-status.txt"
           if [ "$status" -eq 0 ]; then
-            repo manifest -r -o "$GITHUB_WORKSPACE/evidence/targeted-resolved.xml"
+            # A resolved manifest needs ALL 13 projects checked out; only 3 were synced.
+            # Verify the exact pinned revisions directly for the selected paths.
             for p in device/samsung/a7y18lte device/samsung/exynos7885-common kernel/samsung/exynos7885; do
               printf '%s ' "$p" >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
               git -C "$p" rev-parse HEAD >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
             done
+            python3 - "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/targeted-heads.txt" <<'PY'
+            import sys
+            import xml.etree.ElementTree as ET
+            manifest, heads = sys.argv[1:]
+            pins = {p.get("path"): p.get("revision") for p in ET.parse(manifest).getroot().findall("project")}
+            for line in open(heads):
+                path, head = line.split()
+                expected = pins[path]
+                if head != expected:
+                    raise SystemExit(f"Revision mismatch {path}: expected {expected}, got {head}")
+                print(f"VERIFIED {path} {head}")
+            PY
           fi
           exit "$status"
       - name: Capture resources
