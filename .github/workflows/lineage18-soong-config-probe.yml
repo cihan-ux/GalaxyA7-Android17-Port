@@ -1,0 +1,57 @@
+name: LineageOS 18.1 bounded Soong configuration probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  configure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install repo and prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git git-lfs python3 curl openjdk-11-jdk
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/lineage/.repo/local_manifests" evidence
+          curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Initialize historical LineageOS platform
+        working-directory: ${{ runner.temp }}/lineage
+        run: |
+          set -euo pipefail
+          repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          cp "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" .repo/local_manifests/a7-research.xml
+          repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
+      - name: Sync platform with bounded resources
+        working-directory: ${{ runner.temp }}/lineage
+        run: |
+          set -euo pipefail
+          timeout 2100 repo sync -c -j2 --no-clone-bundle --fail-fast
+      - name: Attempt product configuration (no ROM build)
+        working-directory: ${{ runner.temp }}/lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ALLOW_MISSING_DEPENDENCIES=false
+          export USE_CCACHE=0
+          source build/envsetup.sh
+          lunch lineage_a7y18lte-userdebug
+          test -x build/soong/soong_ui.bash
+          timeout 600 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
+      - name: Save result and resource summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          df -h "$RUNNER_TEMP" > evidence/disk.txt
+          free -h > evidence/memory.txt
+          echo 'Historical LineageOS 18.1 configuration attempt only; no flashable ROM, no device access.' > evidence/README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lineage18-soong-config-evidence
+          path: evidence/
+          retention-days: 7
