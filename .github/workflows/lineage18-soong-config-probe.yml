@@ -10,7 +10,7 @@ permissions:
 jobs:
   configure:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Install repo and prerequisites
@@ -66,13 +66,14 @@ jobs:
           set -euo pipefail
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
           set +e
-          timeout --signal=TERM --kill-after=30s 2100 repo sync -c -j2 --no-clone-bundle --fail-fast --no-tags > "$GITHUB_WORKSPACE/evidence/repo-sync.log" 2>&1
-          status=$?
+          timeout --signal=TERM --kill-after=30s 720 repo sync -c -j2 --no-clone-bundle --fail-fast --no-tags 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          status=${PIPESTATUS[0]}
           set -e
-          tail -n 90 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          echo "Captured repo sync log lines: $(wc -l < "$GITHUB_WORKSPACE/evidence/repo-sync.log")"
           printf 'repo sync exit status: %s\\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-after-sync.txt"
           if [ "$status" -ne 0 ]; then
+            tail -n 100 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
             echo "::error::repo sync failed with status $status (124 means timeout); see uploaded repo-sync.log"
             exit "$status"
           fi
