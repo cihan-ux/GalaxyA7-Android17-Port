@@ -18,6 +18,22 @@ HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 SCOPES = {"source-evidence", "candidate-only", "target-evidence"}
+# Explicit metadata-only pins. These have been checked through separate GitHub
+# source-tree CI, but do not have checked-in byte-for-byte source fixtures.
+# Do not silently treat these as source-evidence.
+METADATA_ONLY_PATHS = frozenset({
+    "device/lineage/sepolicy",
+    "device/samsung_slsi/sepolicy",
+    "hardware/samsung",
+    "hardware/samsung_slsi-linaro/config",
+    "hardware/samsung_slsi-linaro/exynos",
+    "hardware/samsung_slsi-linaro/exynos5",
+    "hardware/samsung_slsi-linaro/graphics",
+    "hardware/samsung_slsi-linaro/openmax",
+    "vendor/samsung/a7y18lte",
+    "vendor/samsung/exynos7885-common",
+})
+
 
 
 def _unique_object(pairs):
@@ -127,9 +143,15 @@ def verify_evidence(root=DEFAULT_ROOT, research_manifest=DEFAULT_RESEARCH_MANIFE
         recorded_blob = entry.get("blob_sha", "")
         if not isinstance(recorded_blob, str) or not HEX40.fullmatch(recorded_blob) or blob != recorded_blob:
             errors.append(f"{label}: Git blob SHA mismatch")
-    missing_projects = set(projects) - bound_projects
+    metadata_only = METADATA_ONLY_PATHS & set(projects)
+    missing_projects = set(projects) - bound_projects - metadata_only
     if missing_projects:
         errors.append("No source evidence for manifest projects: " + ", ".join(sorted(missing_projects)))
+    for path in sorted(metadata_only):
+        project = projects[path]
+        revision = project.get("revision", "")
+        if not HEX40.fullmatch(revision):
+            errors.append(f"{path}: metadata-only pin must use immutable SHA")
     extra = {p.relative_to(root).as_posix() for p in root.rglob("*")
              if p.is_file() and p.name not in {"manifest.json", "README.md"}} - seen
     if extra:
