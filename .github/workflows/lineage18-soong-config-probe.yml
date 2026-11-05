@@ -81,17 +81,18 @@ jobs:
           PY
           repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
       - name: Sync platform with bounded resources
+        timeout-minutes: 16
         working-directory: ${{ runner.temp }}/lineage
         run: |
           set -euo pipefail
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
-          echo "Syncing historical platform with verbose progress; 35-minute sync limit."
+          echo "Syncing historical platform with verbose progress; 12-minute diagnostic sync limit to preserve failure artifacts."
           set +e
-          timeout --signal=TERM --kill-after=30s 2100 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          timeout --signal=TERM --kill-after=30s 720 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
           status=${PIPESTATUS[0]}
           set -e
           echo "Captured repo sync log lines: $(wc -l < "$GITHUB_WORKSPACE/evidence/repo-sync.log")"
-          printf 'repo sync exit status: %s\\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
+          printf 'repo sync exit status: %s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-after-sync.txt"
           if [ "$status" -ne 0 ]; then
             tail -n 100 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
@@ -117,7 +118,7 @@ jobs:
           status=$?
           set -e
           tail -n 100 "$GITHUB_WORKSPACE/evidence/soong-config.log"
-          printf 'Soong configuration exit status: %s\\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/soong-status.txt"
+          printf 'Soong configuration exit status: %s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/soong-status.txt"
           exit "$status"
       - name: Save result and resource summary
         if: always()
