@@ -28,7 +28,37 @@ jobs:
           set -euo pipefail
           repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
           mkdir -p .repo/local_manifests
-          cp "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" .repo/local_manifests/a7-research.xml
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/platform-manifest.xml"
+          python3 - "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/platform-manifest.xml" ".repo/local_manifests/a7-research.xml" "$GITHUB_WORKSPACE/evidence/manifest-overrides.txt" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          research, platform, destination, report = sys.argv[1:]
+          base = ET.parse(platform).getroot()
+          overlay = ET.parse(research).getroot()
+          existing = {p.get('path') or p.get('name'): p for p in base.findall('project')}
+          lines = []
+          for project in overlay.findall('project'):
+              path = project.get('path')
+              if path in existing:
+                  prior = existing[path]
+                  name = prior.get('name')
+                  if not name:
+                      raise SystemExit(f'Existing project at {path} has no name')
+                  ET.SubElement(overlay, 'remove-project', {'name': name})
+                  lines.append(f'OVERRIDE {path}: {name} -> {project.get("name")} at {project.get("revision")}')
+              else:
+                  lines.append(f'ADD {path}: {project.get("name")} at {project.get("revision")}')
+          # Remove-project directives must precede all project additions.
+          removals = overlay.findall('remove-project')
+          for item in removals:
+              overlay.remove(item)
+          for index, item in enumerate(removals):
+              overlay.insert(index + len(overlay.findall('remote')), item)
+          ET.indent(overlay)
+          ET.ElementTree(overlay).write(destination, encoding='unicode', xml_declaration=True)
+          open(report, 'w').write('\\n'.join(lines) + '\\n')
+          print('\\n'.join(lines))
+          PY
           repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
       - name: Sync platform with bounded resources
         working-directory: ${{ runner.temp }}/lineage
