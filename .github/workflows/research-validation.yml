@@ -45,5 +45,7 @@ jobs:
         run: python tools/check_android17_product_port.py
       - name: Validate scoped kernel BPF source patch
         run: python tools/check_kernel_bpf_port.py
+      - name: Validate scoped SELinux Wi-Fi property patch
+        run: python tools/check_selinux_wifi_property_port.py
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
