@@ -1,6 +1,11 @@
 name: Pinned kernel compile probe (manual)
 'on':
   workflow_dispatch:
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - .github/workflows/kernel-compile-probe.yml
 permissions:
   contents: read
 jobs:
