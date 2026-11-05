@@ -71,6 +71,31 @@ jobs:
           print('Module inventory generated; SLSI interfaces present:', interfaces.exists())
           print('Exynos 4.4 kernel headers path present:', bool(headers))
           PY
+      - name: Inspect actual SLSI interface references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          roots = [Path('slsi') / name for name in ('config','exynos','exynos5','graphics','openmax')]
+          lines = []
+          for root in roots:
+              for p in sorted(root.rglob('*')):
+                  if not p.is_file() or p.suffix not in ('.bp','.mk','.xml','.h','.cpp','.c'):
+                      continue
+                  try:
+                      if p.stat().st_size > 1_000_000:
+                          continue
+                      for n,line in enumerate(p.read_text(errors='replace').splitlines(),1):
+                          if re.search(r'samsung_slsi-linaro/interfaces|samsung_slsi/interfaces|soong_namespace',line,re.I):
+                              lines.append(f'{p}:{n}: {line.strip()[:220]}')
+                  except OSError:
+                      continue
+          Path('evidence/interface-references.txt').write_text('\n'.join(lines)+'\n')
+          print(f'Found {len(lines)} interface/namespace references across five pinned SLSI trees')
+          print('\n'.join(lines[:30]))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
