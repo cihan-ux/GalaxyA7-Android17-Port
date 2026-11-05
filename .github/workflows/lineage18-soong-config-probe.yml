@@ -1,6 +1,10 @@
 name: LineageOS 18.1 bounded Soong configuration probe
 on:
   workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/lineage18-soong-config-probe.yml'
 permissions:
   contents: read
 jobs:
@@ -14,7 +18,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq git git-lfs python3 curl openjdk-11-jdk
-          mkdir -p "$HOME/bin" "$RUNNER_TEMP/lineage/.repo/local_manifests" evidence
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/lineage" evidence
           curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
           chmod +x "$HOME/bin/repo"
           echo "$HOME/bin" >> "$GITHUB_PATH"
@@ -23,13 +27,15 @@ jobs:
         run: |
           set -euo pipefail
           repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          mkdir -p .repo/local_manifests
           cp "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" .repo/local_manifests/a7-research.xml
-          repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
       - name: Sync platform with bounded resources
         working-directory: ${{ runner.temp }}/lineage
         run: |
           set -euo pipefail
           timeout 2100 repo sync -c -j2 --no-clone-bundle --fail-fast
+          repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
       - name: Attempt product configuration (no ROM build)
         working-directory: ${{ runner.temp }}/lineage
         shell: bash
