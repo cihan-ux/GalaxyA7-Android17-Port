@@ -48,6 +48,29 @@ jobs:
             find "slsi/$name" -maxdepth 2 -type f | sort | head -80 >> evidence/source-layout.txt
           done
           echo 'Source checkouts verified; this is not a full ROM build or proof of interface/SELinux/vendor closure.' | tee evidence/scope.txt
+      - name: Analyze SLSI namespace module and kernel header closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          roots = [Path('slsi') / name for name in ('config','exynos','exynos5','graphics','openmax')]
+          output = ['# Pinned SLSI module inventory', '', 'Evidence only; module presence does not establish build compatibility.', '']
+          for root in roots:
+              bp = sorted(root.rglob('Android.bp'))
+              mk = sorted(root.rglob('Android.mk'))
+              output += [f'## {root.name}', f'Android.bp: {len(bp)}; Android.mk: {len(mk)}', '']
+              for p in (bp + mk)[:80]:
+                  output.append(str(p))
+              output.append('')
+          headers = list(Path('slsi/exynos').glob('kernel-4.4-headers/kernel-headers'))
+          output += ['## Kernel 4.4 header path', f'Found: {bool(headers)}', '']
+          interfaces = Path('slsi/interfaces')
+          output += ['## SLSI interfaces namespace', f'Found: {interfaces.exists()}', '']
+          Path('evidence/slsi-module-closure.md').write_text('\n'.join(output))
+          print('Module inventory generated; SLSI interfaces present:', interfaces.exists())
+          print('Exynos 4.4 kernel headers path present:', bool(headers))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
