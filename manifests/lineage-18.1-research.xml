@@ -9,6 +9,11 @@
   <project name="hardware_samsung" path="hardware/samsung" remote="exynos7885-dev" revision="082709ec235fd60f55bff0fb0deb8eae12bf0622" />
   <project name="android_device_lineage_sepolicy" path="device/lineage/sepolicy" remote="lineageos" revision="02f04d2b0a57f1c7435dc9f2ce8fac2640b38782" />
   <project name="android_device_samsung_slsi_sepolicy" path="device/samsung_slsi/sepolicy" remote="lineageos" revision="9968b62f8f76c22143a8fc7491440aa11c32e6f4" />
+  <project name="hardware_samsung_slsi-linaro_config" path="hardware/samsung_slsi-linaro/config" remote="exynos7885-dev" revision="c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8" />
+  <project name="hardware_samsung_slsi-linaro_exynos" path="hardware/samsung_slsi-linaro/exynos" remote="exynos7885-dev" revision="f05f00d0280b5e84678a444a195ff6ccdb95d813" />
+  <project name="hardware_samsung_slsi-linaro_exynos5" path="hardware/samsung_slsi-linaro/exynos5" remote="exynos7885-dev" revision="6dff1105f24bb5a7d96806f9c61265658e836e25" />
+  <project name="hardware_samsung_slsi-linaro_graphics" path="hardware/samsung_slsi-linaro/graphics" remote="exynos7885-dev" revision="7c28107c046cd666b01adef06617482e26311ab7" />
+  <project name="hardware_samsung_slsi-linaro_openmax" path="hardware/samsung_slsi-linaro/openmax" remote="exynos7885-dev" revision="bf76218765ae6b3636acf0d898bdc81c1a912968" />
   <project name="device_samsung_a7y18lte" path="device/samsung/a7y18lte" remote="exynos7885-dev" revision="f17643ba01010c45b628d5acb8f48350ded61606" />
   <project name="device_samsung_exynos7885-common" path="device/samsung/exynos7885-common" remote="exynos7885-dev" revision="f2ce8d2093711026f021cba7036334d381d455ef" />
   <project name="kernel_samsung_exynos7885" path="kernel/samsung/exynos7885" remote="exynos7885-dev" revision="6020dfa8315134187f07ca903c9d2ed7ee0256f5" />
