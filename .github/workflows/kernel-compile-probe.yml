@@ -67,6 +67,23 @@ jobs:
           build_status=${PIPESTATUS[0]}
           printf '%s\n' "$build_status" > probe-logs/build-exit-code.txt
           exit "$build_status"
+      - name: Verify compiled ARM64 Image and record checksums
+        if: success()
+        run: |
+          set -euo pipefail
+          test -s kernel-out/arch/arm64/boot/Image
+          test -s kernel-out/vmlinux
+          file kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-types.txt
+          sha256sum kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-sha256.txt
+          stat -c '%n %s bytes' kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-sizes.txt
+      - name: Preserve compiled kernel Image (not a flashable boot image)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-lineage18-kernel-Image-unflashable
+          path: kernel-out/arch/arm64/boot/Image
+          retention-days: 7
+          if-no-files-found: error
       - name: Summarize kernel build status
         if: always()
         run: |
