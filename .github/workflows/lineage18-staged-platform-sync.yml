@@ -10,7 +10,7 @@ permissions:
 jobs:
   stages:
     runs-on: ubuntu-24.04
-    timeout-minutes: 24
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Prepare repo launcher
@@ -52,15 +52,15 @@ jobs:
             fi
             start=$(date +%s)
             set +e
-            timeout --signal=TERM --kill-after=15s 240 repo sync -c -j2 --no-clone-bundle --no-tags --fail-fast "$p" > "$GITHUB_WORKSPACE/evidence/stage-${p//\//-}.log" 2>&1
-            status=$?
+            timeout --signal=TERM --kill-after=15s 600 repo sync -c -j2 --no-clone-bundle --no-tags --fail-fast "$p" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/stage-${p//\//-}.log"
+            status=${PIPESTATUS[0]}
             set -e
             end=$(date +%s)
             read -r used avail < <(df -Pk . | awk 'NR==2 {print $3, $4}')
             printf '%s\t%s\t%s\t%s\t%s\n' "$p" "$status" "$((end-start))" "$used" "$avail" | tee -a "$GITHUB_WORKSPACE/evidence/stage-metrics.tsv"
             tail -n 15 "$GITHUB_WORKSPACE/evidence/stage-${p//\//-}.log"
             if [ "$status" -ne 0 ]; then
-              echo "::error::Stage $p failed or timed out (124); consult stage log artifact"
+              echo "::error::Stage $p failed (status $status; 124 means 600-second timeout); consult stage log artifact"
               exit "$status"
             fi
           done
