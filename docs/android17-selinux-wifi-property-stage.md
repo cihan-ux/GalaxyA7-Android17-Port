@@ -1,67 +1,17 @@
-# Android 17 Exynos7885 SELinux: first vendor Wi-Fi property type delta
+# Android 17 Galaxy A7: Samsung SLSI Wi-Fi property SELinux port
 
-**Status: small, testable source patch only — not a compiled Android 17 policy.**
-No handset, firmware blob, privileged identifier or proprietary binary is needed.
+**Source-only candidate; NOT a compiled Android 17 policy or verified handset ROM.**
 
-## What was verified
+## Verified inputs
+- Original Samsung SLSI `common/vendor/property.te` at LineageOS 18.1 commit `9968b62f8f76c22143a8fc7491440aa11c32e6f4` defines `type vendor_wifi_prop, property_type;`.
+- Official Samsung SLSI LineageOS 24.0 commit `224e135300fbb07ee12968cc57ad053a267e3ce4` defines **`vendor_internal_prop(vendor_wifi_prop)`**.
+- Both versions label `vendor.wifi.` and `ro.vendor.wifi.` as `vendor_wifi_prop`; the LineageOS 24.0 Wi-Fi HAL policy uses `get_prop(hal_wifi_default, vendor_wifi_prop)`.
+- LineageOS 24.0 platform SELinux at `d61fd80832f558d52de026097d30d695634e8b0f` defines the internal-property macro with conditional core-domain read restrictions.
 
-Pinned historical source:
-
-- `LineageOS/android_device_samsung_slsi_sepolicy` at
-  `9968b62f8f76c22143a8fc7491440aa11c32e6f4`
-- `common/vendor/property.te` declares
-  `type vendor_wifi_prop, property_type;` without explicit property ownership.
-- `common/vendor/property_contexts` assigns both `vendor.wifi.` and
-  `ro.vendor.wifi.` to `vendor_wifi_prop`.
-
-Target source:
-
-- `LineageOS/android_system_sepolicy` at
-  `d61fd80832f558d52de026097d30d695634e8b0f`
-- [public/te_macros](https://github.com/LineageOS/android_system_sepolicy/blob/d61fd80832f558d52de026097d30d695634e8b0f/public/te_macros)
-  defines `vendor_public_prop(name)` as a vendor-owned, public property type.
-  The macro expands to
-  `type name, property_type, vendor_property_type, vendor_public_property_type;`.
-
-## Port delta
-
-`port/lineage-24.0/device/samsung_slsi/sepolicy/patches/0001-exynos7885-typed-vendor-wifi-property.patch`
-
-The patch replaces only the SLSI vendor Wi-Fi property type declaration with
-`vendor_public_prop(vendor_wifi_prop)`. It preserves the original two
-property-context mappings and does not change `allow`, `neverallow`,
-SELinux enforcement, other SLSI property types, or kernel configuration.
-
-`public` is intentionally a compatibility-oriented *candidate* because
-cross-partition readers have not been audited. It does **not** assert a
-least-privilege policy. A later full policy build may require a narrower
-classification after examining actual producer/consumer domains.
+## Security correction
+The previous candidate used `vendor_public_prop`, which is broader than the official 24.0 Samsung Wi-Fi policy. The follow-up commit revises the one-line patch to `vendor_internal_prop(vendor_wifi_prop)`. This is not a claim that vendor service access is validated. The reduced `m4` fixture exercises type expansion but does not constitute full `secilc`/neverallow compilation.
 
 ## Offline checks
+Run `python3 tools/check_selinux_wifi_property_port.py` and `python3 -m unittest discover -s tests -v`.
 
-```sh
-python3 tools/check_selinux_wifi_property_port.py
-python3 -m unittest tests.test_selinux_wifi_property_port -v
-```
-
-The checker copies the pinned source text into a temporary tree, applies
-`git apply --check` and `git apply`, compares the entire result for a
-single-line delta, and uses `m4` to expand the target macro excerpt.
-The target snippet is copied with upstream provenance; this is *not*
-a substitute for compiling the complete Android 17 system/vendor policy.
-
-## Still blocked
-
-- Android 17 `secilc`/policy compilation, property-context validation,
-  neverallow and vendor/platform policy mapping tests have **not** been run.
-- Other legacy SLSI property types and `ro.multisim.`/`persist.radio.`
-  contexts are not migrated. Their owner and access paths require a separate
-  trace; no broad automatic conversion is appropriate.
-- The device/common VINTF target-level 3, kernel 4.4.302/BPF gap, and
-  HAL/vendor ABI compatibility remain unresolved.
-- The historical vendor source references **A750FNXXU5CVG2**, while the
-  SM-A750F stock build is **A750FXXU5CVG1**. Neither variants nor
-  proprietary files are treated as interchangeable.
-
-This patch would be reviewed against the full checkout and applied to the
-pinned SLSI policy source before a full policy build. There is no ROM to flash.
+Remaining: full policy compilation and property_contexts merging, actual SM-A750F vendor HAL access, kernel 4.4.302 BPF, VINTF FCM level 3 and firmware mismatches (SM-A750F A750FXXU5CVG1 vs reference A750FNXXU5CVG2). No proprietary files, device contact or SELinux bypass.

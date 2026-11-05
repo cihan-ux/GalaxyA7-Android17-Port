@@ -47,5 +47,7 @@ jobs:
         run: python tools/check_kernel_bpf_port.py
       - name: Validate scoped SELinux Wi-Fi property patch
         run: python tools/check_selinux_wifi_property_port.py
+      - name: Validate SLSI SELinux system_ext policy paths
+        run: python tools/check_slsi_sepolicy_layout_port.py
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
