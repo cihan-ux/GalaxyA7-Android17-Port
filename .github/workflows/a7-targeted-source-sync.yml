@@ -58,18 +58,18 @@ jobs:
               printf '%s ' "$p" >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
               git -C "$p" rev-parse HEAD >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
             done
-            python3 - "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/targeted-heads.txt" <<'PY'
-            import sys
-            import xml.etree.ElementTree as ET
-            manifest, heads = sys.argv[1:]
-            pins = {p.get("path"): p.get("revision") for p in ET.parse(manifest).getroot().findall("project")}
-            for line in open(heads):
-                path, head = line.split()
-                expected = pins[path]
-                if head != expected:
-                    raise SystemExit(f"Revision mismatch {path}: expected {expected}, got {head}")
-                print(f"VERIFIED {path} {head}")
-            PY
+            python3 -c '
+          import sys
+          import xml.etree.ElementTree as ET
+          manifest, heads = sys.argv[1:]
+          pins = {p.get("path"): p.get("revision") for p in ET.parse(manifest).getroot().findall("project")}
+          for line in open(heads):
+              path, head = line.split()
+              expected = pins[path]
+              if head != expected:
+                  raise SystemExit(f"Revision mismatch {path}: expected {expected}, got {head}")
+              print(f"VERIFIED {path} {head}")
+          ' "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
           fi
           exit "$status"
       - name: Capture resources
