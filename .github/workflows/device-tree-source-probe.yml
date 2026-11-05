@@ -54,6 +54,28 @@ jobs:
           Path('source-probe/unresolved-path-candidates.txt').write_text('\n'.join(sorted(set(missing)))+'\n')
           print(f'Found {len(output)} matching lines; {len(set(missing))} unresolved path candidates (not all are mandatory dependencies).')
           print('\n'.join(sorted(set(missing))[:60]))
+          categories = {
+              'vendor/samsung/': 'device-vendor-blobs',
+              'device/lineage/': 'lineage-platform-policy',
+              'device/samsung_slsi/': 'samsung-slsi-policy',
+              'hardware/samsung_slsi': 'samsung-slsi-hardware',
+              'hardware/samsung/': 'samsung-hardware',
+              'vendor/lineage/': 'lineage-platform',
+              'vendor/lib': 'runtime-binary-reference',
+              'hardware/google/': 'google-platform',
+          }
+          grouped = {}
+          for entry in sorted(set(missing)):
+              target = entry.split(': ', 1)[-1]
+              category = next((name for prefix, name in categories.items() if target.startswith(prefix)), 'other-source-reference')
+              grouped.setdefault(category, []).append(entry)
+          report = ['# Pinned device tree dependency classification', '', 'This report classifies unresolved source-tree path references. It does not prove every path is a required missing repository.', '']
+          for category, entries in sorted(grouped.items()):
+              report += [f'## {category} ({len(entries)})', '']
+              report += [f'- {entry}' for entry in entries]
+              report += ['']
+          Path('source-probe/dependency-classification.md').write_text('\n'.join(report))
+          print('Dependency groups: ' + ', '.join(f'{name}={len(entries)}' for name, entries in sorted(grouped.items())))
           PY
       - name: Upload reproducible source evidence
         if: always()
