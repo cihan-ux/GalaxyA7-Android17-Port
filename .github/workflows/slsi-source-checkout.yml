@@ -96,6 +96,29 @@ jobs:
           print(f'Found {len(lines)} interface/namespace references across five pinned SLSI trees')
           print('\n'.join(lines[:30]))
           PY
+      - name: Identify actual Soong module references to missing interfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          roots = [Path('slsi') / name for name in ('config','exynos','exynos5','graphics','openmax')]
+          refs=[]
+          for root in roots:
+              for p in root.rglob('*'):
+                  if not p.is_file() or p.suffix not in ('.bp','.mk'):
+                      continue
+                  if p.stat().st_size > 1_000_000:
+                      continue
+                  for n,line in enumerate(p.read_text(errors='replace').splitlines(),1):
+                      if re.search(r'(?:samsung_slsi-linaro/interfaces|samsung_slsi/interfaces|interfaces/)',line):
+                          refs.append(f'{p}:{n}: {line.strip()[:220]}')
+          output=['# Direct interface path references', '', 'Only exact path references in pinned .bp/.mk files are listed. Missing namespace alone does not establish missing modules.', ''] + ['- '+r for r in refs]
+          Path('evidence/direct-interface-dependencies.md').write_text('\n'.join(output)+'\n')
+          print(f'Direct interface path references in build files: {len(refs)}')
+          print('\n'.join(refs[:30]))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
