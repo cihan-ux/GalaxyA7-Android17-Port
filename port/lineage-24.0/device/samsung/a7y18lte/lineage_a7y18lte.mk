@@ -8,10 +8,11 @@
 $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
 
-# Samsung Galaxy A7 (2018) launched with Android 9 (API 28).
-# The LineageOS 24.0 target provides this file setting
-# PRODUCT_SHIPPING_API_LEVEL := 28; never falsify the shipping API.
-$(call inherit-product, $(SRC_TARGET_DIR)/product/product_launched_with_p.mk)
+# Samsung's SM-A750F update history confirms original Android 8.0 (API 26).
+# The pinned legacy LineageOS 18.1 tree instead says 28: record that
+# mismatch, but do not silently carry an inaccurate launch API into A17.
+# Actual vendor/FCM viability with shipping API 26 is NOT yet verified.
+$(call inherit-product, $(SRC_TARGET_DIR)/product/product_launched_with_o.mk)
 
 $(call inherit-product, device/samsung/a7y18lte/device.mk)
 $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
