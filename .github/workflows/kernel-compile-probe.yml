@@ -23,6 +23,20 @@ jobs:
           git -C kernel checkout 6020dfa8315134187f07ca903c9d2ed7ee0256f5
           test "$(git -C kernel rev-parse HEAD)" = 6020dfa8315134187f07ca903c9d2ed7ee0256f5
           test -f kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+      - name: Apply isolated legacy Clang compatibility fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('kernel/drivers/input/input.c')
+          original = source.read_text()
+          old = 'void input_booster_init()'
+          new = 'void input_booster_init(void)'
+          if original.count(old) != 1:
+              raise SystemExit('Expected exactly one legacy input_booster_init declaration; upstream source changed')
+          source.write_text(original.replace(old, new))
+          PY
+          git -C kernel diff --check
+          git -C kernel diff -- drivers/input/input.c
       - name: Record toolchain versions
         run: |
           mkdir -p probe-logs
@@ -40,12 +54,12 @@ jobs:
           if [ "$config_status" -ne 0 ]; then
             echo 'Kernel configuration failed; compile not attempted.' > probe-logs/build.log
             echo 125 > probe-logs/build-exit-code.txt
-            exit 0
+            exit "$config_status"
           fi
           make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- Image 2>&1 | tee probe-logs/build.log
           build_status=${PIPESTATUS[0]}
           printf '%s\n' "$build_status" > probe-logs/build-exit-code.txt
-          exit 0
+          exit "$build_status"
       - name: Summarize kernel build status
         if: always()
         run: |
