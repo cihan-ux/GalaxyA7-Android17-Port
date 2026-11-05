@@ -14,3 +14,13 @@ python3 tools/audit_slsi_namespaces.py --available-list /tmp/slsi-present.txt --
 ```
 
 The command should exit 1 and report `hardware/samsung_slsi-linaro/interfaces` as unresolved. This is a **synthetic inventory demonstration**, not evidence that these directories exist in a local Android checkout. Full Soong dependency closure, licenses, platform compatibility and an actual build remain blocked. No phone interaction.
+
+## Actual checkout verification (read-only)
+
+When a complete Android source checkout is available, the scanner can now inspect its real namespace directories:
+
+```sh
+python3 tools/audit_slsi_namespaces.py --checkout-root /path/to/android/source --strict
+```
+
+This mode does not download, modify or build anything. It rejects symlinked namespace paths (including symlinked parents) as requiring review and treats ordinary files as missing directories. The `--available-list` mode remains available for synthetic inventory research. A present directory is not evidence of a valid Android.bp module graph or successful build.
