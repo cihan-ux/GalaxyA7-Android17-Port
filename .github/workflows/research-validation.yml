@@ -49,5 +49,11 @@ jobs:
         run: python tools/check_selinux_wifi_property_port.py
       - name: Validate SLSI SELinux system_ext policy paths
         run: python tools/check_slsi_sepolicy_layout_port.py
+      - name: Install standalone SELinux CIL compiler
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends secilc
+      - name: Compile minimal SELinux Wi-Fi CIL and reject forbidden access
+        run: python tools/check_slsi_wifi_cil.py
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
