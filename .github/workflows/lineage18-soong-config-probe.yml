@@ -81,22 +81,34 @@ jobs:
           PY
           repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
       - name: Sync platform with bounded resources
-        timeout-minutes: 16
+        timeout-minutes: 30
         working-directory: ${{ runner.temp }}/lineage
         run: |
           set -euo pipefail
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
-          echo "Syncing historical platform with verbose progress; 12-minute diagnostic sync limit to preserve failure artifacts."
+          echo "Syncing historical platform with a bounded 25-minute limit; capturing disk activity every minute."
+          (
+            while true; do
+              printf '%s sync heartbeat: ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              df -Pk . | awk 'NR==2 {printf "used_kb=%s available_kb=%s\\n", $3, $4}'
+              sleep 60
+            done
+          ) 2>&1 | tee "$GITHUB_WORKSPACE/evidence/sync-heartbeat.log" &
+          heartbeat_pid=$!
+          trap 'kill "$heartbeat_pid" 2>/dev/null || true' EXIT
           set +e
-          timeout --signal=TERM --kill-after=30s 720 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          PYTHONUNBUFFERED=1 timeout --signal=TERM --kill-after=30s 1500 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
           status=${PIPESTATUS[0]}
           set -e
+          kill "$heartbeat_pid" 2>/dev/null || true
+          wait "$heartbeat_pid" 2>/dev/null || true
+          trap - EXIT
           echo "Captured repo sync log lines: $(wc -l < "$GITHUB_WORKSPACE/evidence/repo-sync.log")"
           printf 'repo sync exit status: %s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-after-sync.txt"
           if [ "$status" -ne 0 ]; then
             tail -n 100 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
-            echo "::error::repo sync failed with status $status (124 means timeout); see uploaded repo-sync.log"
+            echo "::error::repo sync failed with status $status (124 means the bounded 25-minute timeout); see uploaded repo-sync.log"
             exit "$status"
           fi
           repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
