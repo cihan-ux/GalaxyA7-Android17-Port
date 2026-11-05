@@ -39,3 +39,23 @@ class SlsiNamespaceTests(unittest.TestCase):
         self.assertEqual(namespaces(source), [])
         self.assertEqual(namespaces("PRODUCT_SOONG_NAMESPACES += \\\n hardware/samsung_slsi-linaro/graphics # comment"),
                          ["hardware/samsung_slsi-linaro/graphics"])
+
+    def test_unknown_literal_namespace_rejected(self):
+        with self.assertRaises(ValueError):
+            namespaces("PRODUCT_SOONG_NAMESPACES += hardware/unknown/interfaces")
+
+    def test_dynamic_namespace_rejected(self):
+        with self.assertRaises(ValueError):
+            namespaces("PRODUCT_SOONG_NAMESPACES += hardware/samsung_slsi-linaro/$(TARGET_SOC)")
+
+    def test_malformed_assignment_rejected(self):
+        with self.assertRaises(ValueError):
+            namespaces("PRODUCT_SOONG_NAMESPACES ?= hardware/samsung_slsi-linaro/graphics")
+
+    def test_colon_assignment_supported(self):
+        self.assertEqual(namespaces("PRODUCT_SOONG_NAMESPACES := hardware/samsung_slsi-linaro/graphics"),
+                         ["hardware/samsung_slsi-linaro/graphics"])
+
+    def test_trailing_non_namespace_token_rejected(self):
+        with self.assertRaises(ValueError):
+            namespaces("PRODUCT_SOONG_NAMESPACES += hardware/samsung_slsi-linaro/graphics unknown")
