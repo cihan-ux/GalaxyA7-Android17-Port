@@ -10,7 +10,7 @@ permissions:
 jobs:
   configure:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Install repo and prerequisites
@@ -57,7 +57,7 @@ jobs:
           ET.indent(overlay)
           ET.ElementTree(overlay).write(destination, encoding='unicode', xml_declaration=True)
           open(report, 'w').write(chr(10).join(lines) + chr(10))
-          print('\\n'.join(lines))
+          print(chr(10).join(lines))
           PY
           repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
       - name: Sync platform with bounded resources
@@ -65,9 +65,9 @@ jobs:
         run: |
           set -euo pipefail
           df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
-          echo "Syncing historical platform with verbose progress; 40-minute sync limit."
+          echo "Syncing historical platform with verbose progress; 35-minute sync limit."
           set +e
-          timeout --signal=TERM --kill-after=30s 2400 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          timeout --signal=TERM --kill-after=30s 2100 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
           status=${PIPESTATUS[0]}
           set -e
           echo "Captured repo sync log lines: $(wc -l < "$GITHUB_WORKSPACE/evidence/repo-sync.log")"
