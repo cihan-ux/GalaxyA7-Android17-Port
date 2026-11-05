@@ -1,0 +1,85 @@
+name: Galaxy A7 real BPF kernel object build
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/a7-bpf-object-compile.yml'
+      - 'port/lineage-24.0/kernel/samsung/exynos7885/patches/**'
+      - 'tools/check_kernel_bpf_port.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-bpf-object:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout port sources
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Validate isolated BPF patch locally
+        run: python3 tools/check_kernel_bpf_port.py
+      - name: Install native and ARM64 toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends make clang lld llvm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf binutils-aarch64-linux-gnu bc bison flex libssl-dev libelf-dev
+      - name: Fetch exact maintained 4.4.302 kernel tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/exynos7885-dev/kernel_samsung_exynos7885.git
+          git -C kernel fetch --depth 1 origin 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          test -f kernel/kernel/bpf/syscall.c
+          test -f kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+      - name: Apply actual BPF syscall defconfig source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C kernel apply --check "$GITHUB_WORKSPACE/port/lineage-24.0/kernel/samsung/exynos7885/patches/0001-a7y18lte-bpf-syscall-research.patch"
+          git -C kernel apply "$GITHUB_WORKSPACE/port/lineage-24.0/kernel/samsung/exynos7885/patches/0001-a7y18lte-bpf-syscall-research.patch"
+          git -C kernel diff --check
+          git -C kernel diff --exit-code -- kernel/bpf/syscall.c
+          grep -qx 'CONFIG_BPF_SYSCALL=y' kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+      - name: Generate real kernel ARM64 configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe-logs
+          set -o pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- lineage_a7y18lte_defconfig 2>&1 | tee probe-logs/config.log
+          grep -qx 'CONFIG_BPF_SYSCALL=y' kernel-out/.config
+          grep -qx 'CONFIG_BPF=y' kernel-out/.config
+          grep -qx 'CONFIG_ANON_INODES=y' kernel-out/.config
+          grep -qx 'CONFIG_SECURITY_SELINUX=y' kernel-out/.config
+          cp kernel-out/.config probe-logs/arm64-bpf-enabled.config
+      - name: Compile real kernel BPF syscall ARM64 object
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion kernel/bpf/syscall.o 2>&1 | tee probe-logs/build.log
+          test -s kernel-out/kernel/bpf/syscall.o
+          readelf -h kernel-out/kernel/bpf/syscall.o | tee probe-logs/elf-header.txt
+          readelf -h kernel-out/kernel/bpf/syscall.o | grep -q 'AArch64'
+          sha256sum kernel-out/kernel/bpf/syscall.o | tee probe-logs/sha256.txt
+      - name: Preserve compiled ARM64 BPF object (not flashable)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-arm64-bpf-syscall-object-not-flashable
+          path: kernel-out/kernel/bpf/syscall.o
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve evidence, including failure logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-bpf-object-build-evidence
+          path: probe-logs/
+          if-no-files-found: warn
+          retention-days: 7
