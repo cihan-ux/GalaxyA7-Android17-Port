@@ -56,7 +56,7 @@ jobs:
               overlay.insert(index + len(overlay.findall('remote')), item)
           ET.indent(overlay)
           ET.ElementTree(overlay).write(destination, encoding='unicode', xml_declaration=True)
-          open(report, 'w').write('\\n'.join(lines) + '\\n')
+          open(report, 'w').write(chr(10).join(lines) + chr(10))
           print('\\n'.join(lines))
           PY
           repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
@@ -64,7 +64,18 @@ jobs:
         working-directory: ${{ runner.temp }}/lineage
         run: |
           set -euo pipefail
-          timeout 2100 repo sync -c -j2 --no-clone-bundle --fail-fast
+          df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
+          set +e
+          timeout --signal=TERM --kill-after=30s 2100 repo sync -c -j2 --no-clone-bundle --fail-fast --no-tags > "$GITHUB_WORKSPACE/evidence/repo-sync.log" 2>&1
+          status=$?
+          set -e
+          tail -n 90 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          printf 'repo sync exit status: %s\\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
+          df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-after-sync.txt"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::repo sync failed with status $status (124 means timeout); see uploaded repo-sync.log"
+            exit "$status"
+          fi
           repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
       - name: Attempt product configuration (no ROM build)
         working-directory: ${{ runner.temp }}/lineage
@@ -73,10 +84,19 @@ jobs:
           set -euo pipefail
           export ALLOW_MISSING_DEPENDENCIES=false
           export USE_CCACHE=0
-          source build/envsetup.sh
-          lunch lineage_a7y18lte-userdebug
-          test -x build/soong/soong_ui.bash
-          timeout 600 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
+          set +e
+          (
+            set -e
+            source build/envsetup.sh
+            lunch lineage_a7y18lte-userdebug
+            test -x build/soong/soong_ui.bash
+            timeout 600 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
+          ) > "$GITHUB_WORKSPACE/evidence/soong-config.log" 2>&1
+          status=$?
+          set -e
+          tail -n 100 "$GITHUB_WORKSPACE/evidence/soong-config.log"
+          printf 'Soong configuration exit status: %s\\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/soong-status.txt"
+          exit "$status"
       - name: Save result and resource summary
         if: always()
         shell: bash
