@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           set -o pipefail
-          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion kernel/bpf/built-in.o 2>&1 | tee probe-logs/build.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion kernel/bpf/ 2>&1 | tee probe-logs/build.log
           for object in core syscall verifier inode helpers hashtab arraymap built-in; do
             test -s "kernel-out/kernel/bpf/$object.o"
             readelf -h "kernel-out/kernel/bpf/$object.o" | grep -q 'AArch64'
