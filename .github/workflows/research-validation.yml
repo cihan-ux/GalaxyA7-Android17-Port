@@ -43,5 +43,7 @@ jobs:
         run: python tools/check_source_evidence.py
       - name: Validate Android 17 staged product source
         run: python tools/check_android17_product_port.py
+      - name: Validate scoped kernel BPF source patch
+        run: python tools/check_kernel_bpf_port.py
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
