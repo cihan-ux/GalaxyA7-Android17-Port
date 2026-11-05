@@ -45,18 +45,52 @@ def inventory(config, known_paths):
             "unresolved": sorted(set(required) - known),
             "warning": "Repository discovery and namespace presence do not establish module or Android 17 compatibility"}
 
+
+def checkout_inventory(config, checkout_root):
+    """Inspect real checkout directories without following symlinks outside root.
+
+    Existence is only a structural signal, not proof of Soong modules or ABI.
+    """
+    root = Path(checkout_root).resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError("Checkout root must be a directory")
+    required = namespaces(config)
+    present = []
+    unsafe = []
+    for name in required:
+        candidate = root / name
+        # Symlinks (including symlinked parent directories) require review.
+        parts = Path(name).parts
+        if any((root.joinpath(*parts[:i])).is_symlink()
+               for i in range(1, len(parts) + 1)):
+            unsafe.append(name)
+            continue
+        if candidate.is_dir() and candidate.resolve().is_relative_to(root):
+            present.append(name)
+    result = inventory(config, present)
+    result["unsafe_symlinks"] = sorted(unsafe)
+    result["warning"] = "Directory presence alone does not prove Soong module or Android 17 compatibility"
+    return result
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--available-list", type=Path, required=True,
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--available-list", type=Path,
                         help="Verified checked-out namespace directory paths, one per line")
-    parser.add_argument("--strict", action="store_true", help="Return 1 when namespaces are missing")
+    group.add_argument("--checkout-root", type=Path,
+                       help="Read-only check of real namespace directories in a checkout")
+    parser.add_argument("--strict", action="store_true", help="Return 1 when namespaces are missing or unsafe")
     args = parser.parse_args(argv)
-    available = [line.strip() for line in args.available_list.read_text(encoding="utf-8").splitlines()
-                 if line.strip() and not line.lstrip().startswith("#")]
-    result = inventory(args.config.read_text(encoding="utf-8"), available)
+    config = args.config.read_text(encoding="utf-8")
+    if args.checkout_root is not None:
+        result = checkout_inventory(config, args.checkout_root)
+    else:
+        available = [line.strip() for line in args.available_list.read_text(encoding="utf-8").splitlines()
+                     if line.strip() and not line.lstrip().startswith("#")]
+        result = inventory(config, available)
     print(json.dumps(result, indent=2))
-    return int(args.strict and bool(result["unresolved"]))
+    return int(args.strict and bool(result["unresolved"] or result.get("unsafe_symlinks")))
 
 if __name__ == "__main__":
     raise SystemExit(main())
