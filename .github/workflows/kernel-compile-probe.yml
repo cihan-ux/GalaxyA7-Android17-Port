@@ -1,0 +1,61 @@
+name: Pinned kernel compile probe (manual)
+'on':
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Install cross-compiler prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git make clang lld llvm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf binutils-aarch64-linux-gnu bc bison flex libssl-dev libelf-dev python3
+      - name: Checkout pinned source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/exynos7885-dev/kernel_samsung_exynos7885.git kernel
+          git -C kernel checkout 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          test "$(git -C kernel rev-parse HEAD)" = 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          test -f kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+      - name: Record toolchain versions
+        run: |
+          mkdir -p probe-logs
+          { uname -a; clang --version; aarch64-linux-gnu-gcc --version; arm-linux-gnueabihf-gcc --version; git -C kernel rev-parse HEAD; df -h .; free -h; } > probe-logs/environment.txt 2>&1
+          cat probe-logs/environment.txt
+      - name: Attempt actual kernel config and build
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          mkdir -p probe-logs
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- lineage_a7y18lte_defconfig 2>&1 | tee probe-logs/config.log
+          config_status=${PIPESTATUS[0]}
+          printf '%s\n' "$config_status" > probe-logs/config-exit-code.txt
+          if [ "$config_status" -ne 0 ]; then
+            echo 'Kernel configuration failed; compile not attempted.' > probe-logs/build.log
+            echo 125 > probe-logs/build-exit-code.txt
+            exit 0
+          fi
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- Image 2>&1 | tee probe-logs/build.log
+          build_status=${PIPESTATUS[0]}
+          printf '%s\n' "$build_status" > probe-logs/build-exit-code.txt
+          exit 0
+      - name: Summarize kernel build status
+        if: always()
+        run: |
+          {
+            echo '## Pinned Samsung Exynos7885 kernel build probe'
+            echo 'Source: 6020dfa8315134187f07ca903c9d2ed7ee0256f5'
+            echo "Configuration exit code: $(cat probe-logs/config-exit-code.txt 2>/dev/null || echo not-run)"
+            echo "Kernel Image exit code: $(cat probe-logs/build-exit-code.txt 2>/dev/null || echo not-run)"
+            echo 'Workflow success does NOT mean kernel compilation succeeded; inspect log artifacts and exit codes.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinned-kernel-compile-probe-logs
+          path: probe-logs/
+          retention-days: 7
+          if-no-files-found: warn
