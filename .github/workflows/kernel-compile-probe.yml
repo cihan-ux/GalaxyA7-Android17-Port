@@ -34,6 +34,13 @@ jobs:
           if original.count(old) != 1:
               raise SystemExit('Expected exactly one legacy input_booster_init declaration; upstream source changed')
           source.write_text(original.replace(old, new))
+          source = Path('kernel/drivers/mfd/s2mpu08_irq.c')
+          original = source.read_text()
+          old = 'void set_codec_notifier_flag()'
+          new = 'void set_codec_notifier_flag(void)'
+          if original.count(old) != 1:
+              raise SystemExit('Expected exactly one set_codec_notifier_flag declaration; upstream source changed')
+          source.write_text(original.replace(old, new))
           PY
           git -C kernel diff --check
           git -C kernel diff -- drivers/input/input.c
@@ -56,7 +63,7 @@ jobs:
             echo 125 > probe-logs/build-exit-code.txt
             exit "$config_status"
           fi
-          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- Image 2>&1 | tee probe-logs/build.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- KCFLAGS=-Wno-error=enum-conversion Image 2>&1 | tee probe-logs/build.log
           build_status=${PIPESTATUS[0]}
           printf '%s\n' "$build_status" > probe-logs/build-exit-code.txt
           exit "$build_status"
