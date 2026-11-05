@@ -1,0 +1,64 @@
+name: Pinned Galaxy A7 device-tree source probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/device-tree-source-probe.yml'
+      - 'manifests/lineage-18.1-research.xml'
+permissions:
+  contents: read
+jobs:
+  source-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned real device and common trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source-probe device/samsung
+          git clone --filter=blob:none https://github.com/exynos7885-dev/device_samsung_a7y18lte.git device/samsung/a7y18lte
+          git -C device/samsung/a7y18lte checkout --detach f17643ba01010c45b628d5acb8f48350ded61606
+          git clone --filter=blob:none https://github.com/exynos7885-dev/device_samsung_exynos7885-common.git device/samsung/exynos7885-common
+          git -C device/samsung/exynos7885-common checkout --detach f2ce8d2093711026f021cba7036334d381d455ef
+          git -C device/samsung/a7y18lte rev-parse HEAD | tee source-probe/device-sha.txt
+          git -C device/samsung/exynos7885-common rev-parse HEAD | tee source-probe/common-sha.txt
+      - name: Inspect actual makefile and manifest dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          roots = [Path('device/samsung/a7y18lte'), Path('device/samsung/exynos7885-common')]
+          patterns = [
+              re.compile(r'(?:inherit-product(?:-if-exists)?|include|\$\(call\s+inherit-product(?:-if-exists)?)\b'),
+              re.compile(r'(?:device|vendor|hardware)/[A-Za-z0-9_./+-]+'),
+          ]
+          output = []
+          missing = []
+          for root in roots:
+              files = sorted(p for p in root.rglob('*') if p.is_file() and (p.suffix in {'.mk', '.xml'} or p.name in {'BoardConfig.mk', 'AndroidProducts.mk'}))
+              output.append(f'ROOT {root} FILES {len(files)}')
+              for p in files:
+                  for n, line in enumerate(p.read_text(errors='replace').splitlines(), 1):
+                      if any(pattern.search(line) for pattern in patterns):
+                          output.append(f'{p}:{n}: {line.strip()}')
+                          for path in re.findall(r'(?:device|vendor|hardware)/[A-Za-z0-9_./+-]+', line):
+                              candidate = Path(path.rstrip('/'))
+                              if not candidate.exists():
+                                  missing.append(f'{p}:{n}: {candidate}')
+          Path('source-probe/dependency-references.txt').write_text('\n'.join(output)+'\n')
+          Path('source-probe/unresolved-path-candidates.txt').write_text('\n'.join(sorted(set(missing)))+'\n')
+          print(f'Found {len(output)} matching lines; {len(set(missing))} unresolved path candidates (not all are mandatory dependencies).')
+          print('\n'.join(sorted(set(missing))[:60]))
+          PY
+      - name: Upload reproducible source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinned-device-tree-source-evidence
+          path: source-probe/
+          retention-days: 7
