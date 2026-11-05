@@ -40,15 +40,15 @@ def check_product(products: str, product: str, launch_api: str) -> list[str]:
     inherited = [
         "product/core_64_bit.mk",
         "product/full_base_telephony.mk",
-        "product/product_launched_with_p.mk",
+        "product/product_launched_with_o.mk",
         "device/samsung/a7y18lte/device.mk",
         "vendor/lineage/config/common_full_phone.mk",
     ]
     offsets = [product.find(token) for token in inherited]
     if -1 in offsets or offsets != sorted(offsets):
         errors.append("Missing or out-of-order platform/device product inheritance")
-    if assignment(launch_api, "PRODUCT_SHIPPING_API_LEVEL") != "28":
-        errors.append("Inspected Android 17 launched-with-P source is not API 28")
+    if assignment(launch_api, "PRODUCT_SHIPPING_API_LEVEL") != "26":
+        errors.append("Inspected Android 17 launched-with-P source is not API 26")
     if assignment(product, "PRODUCT_SHIPPING_API_LEVEL") is not None:
         errors.append("Shipping API must be inherited, not overridden in the port delta")
     for marker in ("PRODUCT_SHIPPING_API_LEVEL := 37", "SELINUX_IGNORE_NEVERALLOWS",
@@ -70,6 +70,14 @@ def observed_blockers(root: Path) -> list[str]:
     version = ".".join(assignment(makefile, k) or "UNKNOWN"
                        for k in ("VERSION", "PATCHLEVEL", "SUBLEVEL"))
     observations.append(f"historical kernel source version={version}")
+    kernel_config = (fixtures / "kernel/arch/arm64/configs/lineage_a7y18lte_defconfig").read_text()
+    observations.append("historical Android Binder IPC enabled="
+                        + str("CONFIG_ANDROID_BINDER_IPC=y" in kernel_config))
+    observations.append("historical BPF syscall enabled="
+                        + str("CONFIG_BPF_SYSCALL=y" in kernel_config))
+    baseline_product = (fixtures / "device/lineage_a7y18lte.mk").read_text()
+    observations.append("pinned legacy product shipping API="
+                        + str(assignment(baseline_product, "PRODUCT_SHIPPING_API_LEVEL")))
     common = (fixtures / "common/BoardConfigCommon.mk").read_text()
     observations.append("historical vendor SELinux dirs declared="
                         + str("BOARD_VENDOR_SEPOLICY_DIRS" in common))
@@ -82,7 +90,7 @@ def observed_blockers(root: Path) -> list[str]:
 def main(root: Path = ROOT) -> int:
     products = (root / PORT / "AndroidProducts.mk").read_text()
     product = (root / PORT / "lineage_a7y18lte.mk").read_text()
-    launch_api = (root / "tests/fixtures/lineage24/product_launched_with_p.mk").read_text()
+    launch_api = (root / "tests/fixtures/lineage24/product_launched_with_o.mk").read_text()
     errors = check_product(products, product, launch_api)
     for error in errors:
         print(f"FAIL: {error}", file=sys.stderr)
