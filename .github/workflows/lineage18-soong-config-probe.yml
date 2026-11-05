@@ -14,11 +14,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install repo and prerequisites
+        timeout-minutes: 9
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq git git-lfs python3 curl openjdk-11-jdk
           mkdir -p "$HOME/bin" "$RUNNER_TEMP/lineage" evidence
+          echo "Checking preinstalled tools and Java version"
+          command -v git python3 curl java || true
+          java -version 2>&1 || true
+          echo "Updating package index (180-second cap)"
+          set +e
+          timeout --signal=TERM --kill-after=15s 180 sudo apt-get update -qq 2>&1 | tee evidence/apt-update.log
+          update_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$update_status" -ne 0 ]; then
+            echo "::error::apt-get update failed or timed out: $update_status"
+            exit "$update_status"
+          fi
+          echo "Installing prerequisites (360-second cap)"
+          set +e
+          timeout --signal=TERM --kill-after=15s 360 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git git-lfs python3 curl openjdk-11-jdk 2>&1 | tee evidence/apt-install.log
+          install_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$install_status" -ne 0 ]; then
+            echo "::error::apt-get install failed or timed out: $install_status"
+            exit "$install_status"
+          fi
           curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
           chmod +x "$HOME/bin/repo"
           echo "$HOME/bin" >> "$GITHUB_PATH"
