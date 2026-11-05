@@ -6,7 +6,7 @@ from tools.check_android17_product_port import (
     PORT, ROOT, check_product, observed_blockers,
 )
 
-TARGET_API = ROOT / "tests/fixtures/lineage24/product_launched_with_p.mk"
+TARGET_API = ROOT / "tests/fixtures/lineage24/product_launched_with_o.mk"
 
 
 class Android17ProductPortTests(unittest.TestCase):
@@ -43,6 +43,9 @@ class Android17ProductPortTests(unittest.TestCase):
         self.assertTrue(any("version=4.4.302" in fact for fact in facts))
         self.assertTrue(any("SELinux dirs declared=True" in fact for fact in facts))
         self.assertTrue(any("vendor product inherited=True" in fact for fact in facts))
+        self.assertTrue(any("pinned legacy product shipping API=28" in fact for fact in facts))
+        self.assertTrue(any("historical Android Binder IPC enabled=True" in fact for fact in facts))
+        self.assertTrue(any("historical BPF syscall enabled=False" in fact for fact in facts))
 
 
 if __name__ == "__main__":
