@@ -36,8 +36,8 @@ class SELinuxWifiPropertyPortTests(unittest.TestCase):
                                  self.macros, self.patch))
 
     def test_rejects_property_macro_mismatch(self):
-        wrong = self.macros.replace("define_prop($1, vendor, public)",
-                                    "define_prop($1, system, public)")
+        wrong = self.macros.replace("define_prop($1, vendor, internal)",
+                                    "define_prop($1, system, internal)")
         self.assertTrue(validate(self.base, self.contexts, wrong, self.patch))
 
     def test_rejects_extra_selinux_allow_rule(self):

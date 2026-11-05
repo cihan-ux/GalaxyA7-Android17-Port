@@ -22,9 +22,9 @@ PATCH = ROOT / ("port/lineage-24.0/device/samsung_slsi/sepolicy/patches/"
                 "0001-exynos7885-typed-vendor-wifi-property.patch")
 POLICY_PATH = Path("common/vendor/property.te")
 LEGACY = "type vendor_wifi_prop, property_type;"
-PORT = "vendor_public_prop(vendor_wifi_prop)"
+PORT = "vendor_internal_prop(vendor_wifi_prop)"
 EXPANDED = ("type vendor_wifi_prop, property_type, vendor_property_type, "
-            "vendor_public_property_type;")
+            "vendor_internal_property_type;")
 
 
 def validate(baseline: str, contexts: str, macros: str, patch: str) -> list[str]:
@@ -35,7 +35,7 @@ def validate(baseline: str, contexts: str, macros: str, patch: str) -> list[str]
         pattern = rf"(?m)^{re.escape(prefix)}\s+u:object_r:vendor_wifi_prop:s0\s*$"
         if not re.search(pattern, contexts):
             errors.append(f"Expected vendor Wi-Fi property label missing: {prefix}")
-    if "define(`vendor_public_prop', `define_prop($1, vendor, public)')" not in macros:
+    if "define(`vendor_internal_prop', `" not in macros:
         errors.append("Pinned Android 17 vendor_public_prop macro excerpt changed")
     if errors:
         return errors
