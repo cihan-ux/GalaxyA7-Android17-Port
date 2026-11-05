@@ -9,28 +9,31 @@ DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "tests/fixtures/upstream/
 NAMESPACE = re.compile(r"^hardware/samsung_slsi-linaro/[a-z0-9_-]+$")
 
 def namespaces(text):
-    """Extract literal namespace tokens from PRODUCT_SOONG_NAMESPACES += blocks."""
+    """Extract literal namespace tokens, rejecting unknown/dynamic entries.
+
+    This is a syntactic audit, not Make evaluation. Both += and := forms are
+    accepted, but dynamic or malformed operands must be manually reviewed.
+    """
     found = set()
     active = False
-    for raw in text.splitlines():
+    for number, raw in enumerate(text.splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         if line.startswith("PRODUCT_SOONG_NAMESPACES"):
-            if not re.match(r"^PRODUCT_SOONG_NAMESPACES\s*\+=", line):
-                active = False
-                continue
+            match = re.fullmatch(r"PRODUCT_SOONG_NAMESPACES\s*(?:\+=|:=|=)\s*(.*)", line)
+            if match is None:
+                raise ValueError(f"Unsupported namespace assignment at line {number}")
             active = True
-            line = line.split("+=", 1)[1].strip()
+            line = match.group(1)
         elif not active:
             continue
         continued = line.endswith("\\")
-        tokens = line.rstrip("\\").split()
-        for token in tokens:
+        for token in line.removesuffix("\\").split():
             if NAMESPACE.fullmatch(token):
                 found.add(token)
-            elif token.startswith("hardware/") or "$" in token:
-                raise ValueError(f"Unresolved namespace expression: {token}")
+            else:
+                raise ValueError(f"Unresolved namespace token at line {number}: {token}")
         active = continued
     return sorted(found)
 
