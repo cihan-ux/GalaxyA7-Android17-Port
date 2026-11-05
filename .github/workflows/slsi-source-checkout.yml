@@ -1,0 +1,56 @@
+name: Verify pinned LineageOS 18.1 SLSI source checkouts
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths: ['.github/workflows/slsi-source-checkout.yml']
+permissions:
+  contents: read
+jobs:
+  verify-slsi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Fetch five documented immutable upstream SLSI revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p slsi evidence
+          git clone --quiet --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_config.git slsi/config
+          git -C slsi/config checkout --quiet --detach c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8
+          test "$(git -C slsi/config rev-parse HEAD)" = "c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8"
+          echo "config c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8" | tee -a evidence/pinned-slsi-commits.txt
+          git clone --quiet --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_exynos.git slsi/exynos
+          git -C slsi/exynos checkout --quiet --detach f05f00d0280b5e84678a444a195ff6ccdb95d813
+          test "$(git -C slsi/exynos rev-parse HEAD)" = "f05f00d0280b5e84678a444a195ff6ccdb95d813"
+          echo "exynos f05f00d0280b5e84678a444a195ff6ccdb95d813" | tee -a evidence/pinned-slsi-commits.txt
+          git clone --quiet --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_exynos5.git slsi/exynos5
+          git -C slsi/exynos5 checkout --quiet --detach 6dff1105f24bb5a7d96806f9c61265658e836e25
+          test "$(git -C slsi/exynos5 rev-parse HEAD)" = "6dff1105f24bb5a7d96806f9c61265658e836e25"
+          echo "exynos5 6dff1105f24bb5a7d96806f9c61265658e836e25" | tee -a evidence/pinned-slsi-commits.txt
+          git clone --quiet --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_graphics.git slsi/graphics
+          git -C slsi/graphics checkout --quiet --detach 7c28107c046cd666b01adef06617482e26311ab7
+          test "$(git -C slsi/graphics rev-parse HEAD)" = "7c28107c046cd666b01adef06617482e26311ab7"
+          echo "graphics 7c28107c046cd666b01adef06617482e26311ab7" | tee -a evidence/pinned-slsi-commits.txt
+          git clone --quiet --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_openmax.git slsi/openmax
+          git -C slsi/openmax checkout --quiet --detach bf76218765ae6b3636acf0d898bdc81c1a912968
+          test "$(git -C slsi/openmax rev-parse HEAD)" = "bf76218765ae6b3636acf0d898bdc81c1a912968"
+          echo "openmax bf76218765ae6b3636acf0d898bdc81c1a912968" | tee -a evidence/pinned-slsi-commits.txt
+      - name: Inspect expected Exynos 7885 configuration and source layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s slsi/config/BoardConfig7885.mk
+          test -s slsi/config/config.mk
+          grep -n 'BOARD_HWC_VERSION\|TARGET_LINUX_KERNEL_VERSION' slsi/config/BoardConfig7885.mk slsi/config/BoardConfigCommon.mk | tee evidence/boardconfig-lines.txt || true
+          for name in config exynos exynos5 graphics openmax; do
+            echo "=== $name ===" >> evidence/source-layout.txt
+            find "slsi/$name" -maxdepth 2 -type f | sort | head -80 >> evidence/source-layout.txt
+          done
+          echo 'Source checkouts verified; this is not a full ROM build or proof of interface/SELinux/vendor closure.' | tee evidence/scope.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pinned-slsi-checkout-evidence
+          path: evidence/
+          retention-days: 7
