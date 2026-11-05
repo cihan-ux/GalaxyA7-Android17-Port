@@ -4,6 +4,7 @@ on:
     paths:
       - 'manifests/**'
       - 'tools/**'
+      - 'port/**'
       - 'tests/**'
       - 'docs/**'
       - 'README.md'
@@ -12,6 +13,7 @@ on:
     paths:
       - 'manifests/**'
       - 'tools/**'
+      - 'port/**'
       - 'tests/**'
       - 'docs/**'
       - 'README.md'
@@ -39,5 +41,7 @@ jobs:
         run: python tools/check_research_manifest.py
       - name: Verify pinned source evidence
         run: python tools/check_source_evidence.py
+      - name: Validate Android 17 staged product source
+        run: python tools/check_android17_product_port.py
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
