@@ -16,6 +16,8 @@ This work starts from `e38e392c71eefec6b7bce3d703bd8a9c9dbe709a` and is proposed
 
 The research-manifest check, offline fixture verifier and **153 tests** pass locally on Python 3.12.14. The scanner's strict CLI returns 1 as expected for the full common BoardConfig with an empty availability inventory. Workflow YAML structure and `git diff --check` pass. The [CI verification record](ci-verification.md) describes historical and hosted checks.
 
+[PR #1](https://github.com/cihan-ux/GalaxyA7-Android17-Port/pull/1) is open and unmerged. Its implementation commit `b7f415f210b72df7a000c455682389ad236e60d3` passed the hosted [PR matrix](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/41937998153): **153 tests on each of Python 3.11 and 3.14**, with manifest and source-evidence verification successful.
+
 These results validate source handling and research tooling. No full Android checkout, compiler/kernel build, SELinux compilation, VINTF run, image validation or device test was completed.
 
 ## Remaining blockers and realistic next steps

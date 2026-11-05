@@ -25,3 +25,9 @@ The workflow runs on pushes and pull requests changing manifests, tools, tests (
 This is a successful **offline research-manifest validation**, not an Android build, boot test, vendor compatibility test or flashable image. The repository remains blocked on complete dependencies and device-specific partition verification.
 
 Downloading the GitHub Actions and setting up the interpreter require normal runner network access; the validation commands themselves are offline. CI does not check out an Android source tree, extract proprietary blobs, build images, or access a phone. A passing run establishes research-tool behavior and fixture integrity only.
+
+## Hosted development-branch verification — 2026-11-05 UTC
+
+[PR #1](https://github.com/cihan-ux/GalaxyA7-Android17-Port/pull/1) was opened from `dev/evidence-based-source-audit` without merging. At implementation commit `b7f415f210b72df7a000c455682389ad236e60d3`, both the [pull-request run 41937998153](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/41937998153) and [push run 41937959455](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/41937959455) completed successfully.
+
+The PR job logs confirm **153 tests passed on Python 3.11 and Python 3.14**; the research-manifest and pinned-source checks passed in both jobs. This records hosted execution of the pinned actions/interpreters, in addition to local Python 3.12.14 validation. Any later documentation-only commit has its own CI result; these links identify the exact implementation revision tested.
