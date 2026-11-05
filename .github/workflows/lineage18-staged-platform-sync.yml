@@ -1,0 +1,78 @@
+name: LineageOS 18.1 staged platform sync diagnostics
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/lineage18-staged-platform-sync.yml'
+permissions:
+  contents: read
+jobs:
+  stages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare repo launcher
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/staged-platform" evidence
+          curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Initialize and inventory upstream platform
+        working-directory: ${{ runner.temp }}/staged-platform
+        run: |
+          set -euo pipefail
+          repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/platform-declared.xml"
+          python3 - "$GITHUB_WORKSPACE/evidence/platform-declared.xml" "$GITHUB_WORKSPACE/evidence/platform-inventory.txt" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          projects = root.findall('project')
+          paths = {p.get('path') or p.get('name') for p in projects}
+          stages = ('build/make', 'build/soong', 'system/core', 'frameworks/base')
+          with open(sys.argv[2], 'w') as out:
+              out.write(f'upstream_projects={len(projects)}\n')
+              for path in stages:
+                  out.write(f'{path} present={path in paths}\n')
+          print(open(sys.argv[2]).read())
+          PY
+      - name: Sync selected upstream platform paths in timed stages
+        working-directory: ${{ runner.temp }}/staged-platform
+        run: |
+          set -euo pipefail
+          : > "$GITHUB_WORKSPACE/evidence/stage-metrics.tsv"
+          printf 'path\texit\tseconds\tused_kb\tavailable_kb\n' >> "$GITHUB_WORKSPACE/evidence/stage-metrics.tsv"
+          for p in build/make build/soong system/core frameworks/base; do
+            if ! grep -Fqx "$p present=True" "$GITHUB_WORKSPACE/evidence/platform-inventory.txt"; then
+              echo "SKIPPED missing path $p" | tee -a "$GITHUB_WORKSPACE/evidence/stage-notes.txt"
+              continue
+            fi
+            start=$(date +%s)
+            set +e
+            timeout --signal=TERM --kill-after=15s 240 repo sync -c -j2 --no-clone-bundle --no-tags --fail-fast "$p" > "$GITHUB_WORKSPACE/evidence/stage-${p//\//-}.log" 2>&1
+            status=$?
+            set -e
+            end=$(date +%s)
+            read -r used avail < <(df -Pk . | awk 'NR==2 {print $3, $4}')
+            printf '%s\t%s\t%s\t%s\t%s\n' "$p" "$status" "$((end-start))" "$used" "$avail" | tee -a "$GITHUB_WORKSPACE/evidence/stage-metrics.tsv"
+            tail -n 15 "$GITHUB_WORKSPACE/evidence/stage-${p//\//-}.log"
+            if [ "$status" -ne 0 ]; then
+              echo "::error::Stage $p failed or timed out (124); consult stage log artifact"
+              exit "$status"
+            fi
+          done
+      - name: Capture diagnostic environment
+        if: always()
+        run: |
+          df -h > evidence/disk.txt
+          free -h > evidence/memory.txt
+          echo 'Selected upstream LineageOS 18.1 paths only. No full platform sync, Soong configuration, ROM build, or phone access.' > evidence/README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lineage18-staged-platform-evidence
+          path: evidence/
+          retention-days: 7
