@@ -1,0 +1,62 @@
+name: Exynos7885 WiFi Bluetooth build reference probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/slsi-wifibt-build-reference-probe.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch exact device and common source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source/device/samsung evidence
+          git clone -q --filter=blob:none https://github.com/exynos7885-dev/device_samsung_a7y18lte.git source/device/samsung/a7y18lte
+          git -C source/device/samsung/a7y18lte checkout -q --detach f17643ba01010c45b628d5acb8f48350ded61606
+          git clone -q --filter=blob:none https://github.com/exynos7885-dev/device_samsung_exynos7885-common.git source/device/samsung/exynos7885-common
+          git -C source/device/samsung/exynos7885-common checkout -q --detach f2ce8d2093711026f021cba7036334d381d455ef
+          git clone -q --filter=blob:none https://github.com/exynos7885-dev/hardware_samsung_slsi-linaro_config.git source/slsi-config
+          git -C source/slsi-config checkout -q --detach c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8
+      - name: Classify WiFi BT and SLSI references in real build files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          roots=[Path('source/device/samsung/a7y18lte'),Path('source/device/samsung/exynos7885-common'),Path('source/slsi-config')]
+          patterns={
+              'slsi-wifibt-path':re.compile(r'hardware/samsung_slsi(?:-linaro)?/(?:scsc_wifibt|interfaces)',re.I),
+              'wifi-bluetooth':re.compile(r'(?<![a-z])(?:wifi|wi-fi|wlan|bluetooth|bt_vendor|wpa_supplicant|hostapd|scsc)(?![a-z])',re.I),
+              'soong-namespace':re.compile(r'PRODUCT_SOONG_NAMESPACES|soong_namespace',re.I),
+          }
+          matches={name:[] for name in patterns}
+          for root in roots:
+              for p in sorted(root.rglob('*')):
+                  if not p.is_file() or p.suffix not in ('.mk','.bp','.xml','.rc','.json') or p.stat().st_size>1000000:
+                      continue
+                  for n,line in enumerate(p.read_text(errors='replace').splitlines(),1):
+                      for name,pattern in patterns.items():
+                          if pattern.search(line):
+                              matches[name].append(f'{p}:{n}: {line.strip()[:240]}')
+          out=['# Pinned Exynos7885 device/common and SLSI config build references','','This is a read-only scan of real historical source files; it is not Soong execution.','']
+          for name,lines in matches.items():
+              out.extend([f'## {name} ({len(lines)})',''])
+              out.extend('- '+line for line in lines)
+              out.append('')
+              print(f'{name}: {len(lines)} matching build lines')
+              for line in lines[:15]: print(line)
+          Path('evidence/build-references.md').write_text('\n'.join(out)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exynos7885-wifibt-build-reference-evidence
+          path: evidence/
+          retention-days: 7

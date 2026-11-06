@@ -1,0 +1,63 @@
+name: Android 17 NetBpfLoad kernel version gate (expected blocker)
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/a7-android17-netbpf-gate.yml'
+      - 'tools/check_android17_netbpf_gate.py'
+      - 'tests/test_android17_netbpf_gate.py'
+      - 'docs/android17-netbpf-kernel-gate.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-actual-upstream-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Retrieve immutable LineageOS 24.0 Connectivity loader source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rev=7c04d866538e6f689823b769fb5c1e614ca0e295
+          base="https://raw.githubusercontent.com/LineageOS/android_packages_modules_Connectivity/$rev"
+          curl --fail --location --silent --show-error --retry 3 \
+            "$base/bpf/loader/NetBpfLoad.cpp" -o "$RUNNER_TEMP/NetBpfLoad.cpp"
+          curl --fail --location --silent --show-error --retry 3 \
+            "$base/bpf/headers/include/bpf/BpfUtils.h" -o "$RUNNER_TEMP/BpfUtils.h"
+          test -s "$RUNNER_TEMP/NetBpfLoad.cpp"
+          test -s "$RUNNER_TEMP/BpfUtils.h"
+          sha256sum "$RUNNER_TEMP/NetBpfLoad.cpp" "$RUNNER_TEMP/BpfUtils.h"
+      - name: Check real Android 17 37.0 kernel minimum (EXPECTED BLOCK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_android17_netbpf_gate.py \
+            --loader "$RUNNER_TEMP/NetBpfLoad.cpp" --utils "$RUNNER_TEMP/BpfUtils.h" \
+            --target-api-full 3700 --expected-status blocked
+      - name: Check real Android 17 37.1 kernel minimum (EXPECTED BLOCK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_android17_netbpf_gate.py \
+            --loader "$RUNNER_TEMP/NetBpfLoad.cpp" --utils "$RUNNER_TEMP/BpfUtils.h" \
+            --target-api-full 3710 --expected-status blocked
+      - name: Run focused offline regression tests
+        run: python3 -m unittest tests.test_android17_netbpf_gate -v
+      - name: Publish blocker summary (not a compatibility pass)
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Android 17 kernel loader gate — research only'
+            echo 'Upstream: LineageOS/android_packages_modules_Connectivity @ 7c04d866538e6f689823b769fb5c1e614ca0e295'
+            echo 'Kernel: pinned Exynos7885 Linux 4.4.302'
+            echo 'EXPECTED: Android 17 / 37.0 requires NetBpfLoad kernel >=5.10; 37.1 requires >=5.15.'
+            echo 'A green CI run validates that the incompatibility was detected; it does NOT certify Android 17 ROM support.'
+            echo 'Never bypass kernel checks, SELinux neverallows or vendor VINTF requirements to get a green build.'
+          } >> "$GITHUB_STEP_SUMMARY"

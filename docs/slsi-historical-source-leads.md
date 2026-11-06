@@ -1,5 +1,7 @@
 # Historical SLSI source leads — not build-approved
 
+Update: [maintained LineageOS 18.1 SLSI sources](slsi-matching-source-discovery.md) have now been located in `exynos7885-dev`. Prefer investigating those exact revisions before the different-chipset historical leads below. Full closure and build compatibility remain unverified.
+
 Research update, 2026-11-05. The pinned Galaxy A7 baseline remains LineageOS 18.1. No Android 17 image has been built.
 
 A historical [ivanmeler/roomservice.xml](https://github.com/ivanmeler/local_manifests/blob/hero_android12/roomservice.xml) lists five SLSI-Linaro repositories from `8890q` at `lineage-19.1`: `config`, `exynos`, `exynos5`, `graphics`, `openmax`. This is a **different Samsung chipset and Android generation**, and omits the `interfaces` sibling. It is useful for tracing the split repository history only. The modern [LineageOS a21s-common dependencies](https://github.com/LineageOS/android_device_samsung_a21s-common/blob/lineage-23.2/lineage.dependencies) include six SLSI-Linaro paths, but are likewise not an A7 build recipe.

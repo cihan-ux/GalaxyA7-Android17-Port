@@ -1,0 +1,12 @@
+diff --git a/arch/arm64/configs/lineage_a7y18lte_defconfig b/arch/arm64/configs/lineage_a7y18lte_defconfig
+--- a/arch/arm64/configs/lineage_a7y18lte_defconfig
++++ b/arch/arm64/configs/lineage_a7y18lte_defconfig
+@@ -184,7 +184,7 @@
+ CONFIG_SIGNALFD=y
+ CONFIG_TIMERFD=y
+ CONFIG_EVENTFD=y
+-# CONFIG_BPF_SYSCALL is not set
++CONFIG_BPF_SYSCALL=y
+ CONFIG_SHMEM=y
+ CONFIG_AIO=y
+ CONFIG_ADVISE_SYSCALLS=y

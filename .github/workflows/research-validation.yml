@@ -4,26 +4,56 @@ on:
     paths:
       - 'manifests/**'
       - 'tools/**'
+      - 'port/**'
       - 'tests/**'
+      - 'docs/**'
+      - 'README.md'
       - '.github/workflows/research-validation.yml'
   pull_request:
     paths:
       - 'manifests/**'
       - 'tools/**'
+      - 'port/**'
       - 'tests/**'
+      - 'docs/**'
+      - 'README.md'
       - '.github/workflows/research-validation.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    name: Offline validation (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.14']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Check research manifest
-        run: python3 tools/check_research_manifest.py
+        run: python tools/check_research_manifest.py
+      - name: Verify pinned source evidence
+        run: python tools/check_source_evidence.py
+      - name: Validate Android 17 staged product source
+        run: python tools/check_android17_product_port.py
+      - name: Validate scoped kernel BPF source patch
+        run: python tools/check_kernel_bpf_port.py
+      - name: Validate scoped SELinux Wi-Fi property patch
+        run: python tools/check_selinux_wifi_property_port.py
+      - name: Validate SLSI SELinux system_ext policy paths
+        run: python tools/check_slsi_sepolicy_layout_port.py
+      - name: Install standalone SELinux CIL compiler
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends secilc
+      - name: Compile minimal SELinux Wi-Fi CIL and reject forbidden access
+        run: python tools/check_slsi_wifi_cil.py
       - name: Run offline tests
-        run: python3 -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -v

@@ -1,0 +1,148 @@
+name: LineageOS 18.1 bounded Soong configuration probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/lineage18-soong-config-probe.yml'
+permissions:
+  contents: read
+jobs:
+  configure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install repo and prerequisites
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/lineage" evidence
+          echo "Checking preinstalled tools and Java version"
+          command -v git python3 curl java || true
+          java -version 2>&1 || true
+          echo "Updating package index (180-second cap)"
+          set +e
+          timeout --signal=TERM --kill-after=15s 180 sudo apt-get update -qq 2>&1 | tee evidence/apt-update.log
+          update_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$update_status" -ne 0 ]; then
+            echo "::error::apt-get update failed or timed out: $update_status"
+            exit "$update_status"
+          fi
+          echo "Installing prerequisites (360-second cap)"
+          set +e
+          timeout --signal=TERM --kill-after=15s 360 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git git-lfs python3 curl openjdk-11-jdk 2>&1 | tee evidence/apt-install.log
+          install_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$install_status" -ne 0 ]; then
+            echo "::error::apt-get install failed or timed out: $install_status"
+            exit "$install_status"
+          fi
+          curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Initialize historical LineageOS platform
+        working-directory: ${{ runner.temp }}/lineage
+        run: |
+          set -euo pipefail
+          repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          mkdir -p .repo/local_manifests
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/platform-manifest.xml"
+          python3 - "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/platform-manifest.xml" ".repo/local_manifests/a7-research.xml" "$GITHUB_WORKSPACE/evidence/manifest-overrides.txt" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          research, platform, destination, report = sys.argv[1:]
+          base = ET.parse(platform).getroot()
+          overlay = ET.parse(research).getroot()
+          existing = {p.get('path') or p.get('name'): p for p in base.findall('project')}
+          lines = []
+          for project in overlay.findall('project'):
+              path = project.get('path')
+              if path in existing:
+                  prior = existing[path]
+                  name = prior.get('name')
+                  if not name:
+                      raise SystemExit(f'Existing project at {path} has no name')
+                  ET.SubElement(overlay, 'remove-project', {'name': name})
+                  lines.append(f'OVERRIDE {path}: {name} -> {project.get("name")} at {project.get("revision")}')
+              else:
+                  lines.append(f'ADD {path}: {project.get("name")} at {project.get("revision")}')
+          # Remove-project directives must precede all project additions.
+          removals = overlay.findall('remove-project')
+          for item in removals:
+              overlay.remove(item)
+          for index, item in enumerate(removals):
+              overlay.insert(index + len(overlay.findall('remote')), item)
+          ET.indent(overlay)
+          ET.ElementTree(overlay).write(destination, encoding='unicode', xml_declaration=True)
+          open(report, 'w').write(chr(10).join(lines) + chr(10))
+          print(chr(10).join(lines))
+          PY
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/declared-manifest.xml"
+      - name: Sync platform with bounded resources
+        timeout-minutes: 30
+        working-directory: ${{ runner.temp }}/lineage
+        run: |
+          set -euo pipefail
+          df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-before-sync.txt"
+          echo "Syncing historical platform with a bounded 25-minute limit; capturing disk activity every minute."
+          (
+            while true; do
+              printf '%s sync heartbeat: ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              df -Pk . | awk 'NR==2 {printf "used_kb=%s available_kb=%s\\n", $3, $4}'
+              sleep 60
+            done
+          ) 2>&1 | tee "$GITHUB_WORKSPACE/evidence/sync-heartbeat.log" &
+          heartbeat_pid=$!
+          trap 'kill "$heartbeat_pid" 2>/dev/null || true' EXIT
+          set +e
+          PYTHONUNBUFFERED=1 timeout --signal=TERM --kill-after=30s 1500 repo sync -c -j4 --no-clone-bundle --fail-fast --no-tags --verbose 2>&1 | tee "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          kill "$heartbeat_pid" 2>/dev/null || true
+          wait "$heartbeat_pid" 2>/dev/null || true
+          trap - EXIT
+          echo "Captured repo sync log lines: $(wc -l < "$GITHUB_WORKSPACE/evidence/repo-sync.log")"
+          printf 'repo sync exit status: %s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
+          df -h . | tee "$GITHUB_WORKSPACE/evidence/disk-after-sync.txt"
+          if [ "$status" -ne 0 ]; then
+            tail -n 100 "$GITHUB_WORKSPACE/evidence/repo-sync.log"
+            echo "::error::repo sync failed with status $status (124 means the bounded 25-minute timeout); see uploaded repo-sync.log"
+            exit "$status"
+          fi
+          repo manifest -r -o "$GITHUB_WORKSPACE/evidence/resolved-manifest.xml"
+      - name: Attempt product configuration (no ROM build)
+        working-directory: ${{ runner.temp }}/lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ALLOW_MISSING_DEPENDENCIES=false
+          export USE_CCACHE=0
+          set +e
+          (
+            set -e
+            source build/envsetup.sh
+            lunch lineage_a7y18lte-userdebug
+            test -x build/soong/soong_ui.bash
+            timeout 420 build/soong/soong_ui.bash --make-mode --skip-ninja nothing
+          ) > "$GITHUB_WORKSPACE/evidence/soong-config.log" 2>&1
+          status=$?
+          set -e
+          tail -n 100 "$GITHUB_WORKSPACE/evidence/soong-config.log"
+          printf 'Soong configuration exit status: %s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/soong-status.txt"
+          exit "$status"
+      - name: Save result and resource summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          df -h "$RUNNER_TEMP" > evidence/disk.txt
+          free -h > evidence/memory.txt
+          echo 'Historical LineageOS 18.1 configuration attempt only; no flashable ROM, no device access.' > evidence/README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lineage18-soong-config-evidence
+          path: evidence/
+          retention-days: 7
