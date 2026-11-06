@@ -1,0 +1,155 @@
+name: Galaxy A7 BPF-enabled ARM64 kernel Image build
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/a7-bpf-kernel-image-build.yml'
+      - 'port/lineage-24.0/kernel/samsung/exynos7885/patches/**'
+      - 'tools/check_kernel_bpf_port.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-kernel-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check exact one-line BPF source delta
+        run: python3 tools/check_kernel_bpf_port.py
+
+      - name: Install kernel build prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            make clang lld llvm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            binutils-aarch64-linux-gnu bc bison flex libssl-dev libelf-dev
+
+      - name: Fetch pinned Exynos7885 Linux 4.4.302 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/exynos7885-dev/kernel_samsung_exynos7885.git
+          git -C kernel fetch --depth 1 origin 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          test -f kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+          test -f kernel/kernel/bpf/syscall.c
+
+      - name: Apply candidate BPF config and known legacy Clang signature fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch="$GITHUB_WORKSPACE/port/lineage-24.0/kernel/samsung/exynos7885/patches/0001-a7y18lte-bpf-syscall-research.patch"
+          git -C kernel apply --check "$patch"
+          git -C kernel apply "$patch"
+          python3 - <<'PY'
+          from pathlib import Path
+          changes = (
+              ("drivers/input/input.c", "void input_booster_init()", "void input_booster_init(void)"),
+              ("drivers/mfd/s2mpu08_irq.c", "void set_codec_notifier_flag()", "void set_codec_notifier_flag(void)"),
+          )
+          for path, before, after in changes:
+              source = Path("kernel") / path
+              original = source.read_text()
+              if original.count(before) != 1:
+                  raise SystemExit(f"Expected one upstream signature in {path}; aborting")
+              source.write_text(original.replace(before, after))
+          PY
+          git -C kernel diff --check
+          git -C kernel diff --stat
+          grep -qx 'CONFIG_BPF_SYSCALL=y' kernel/arch/arm64/configs/lineage_a7y18lte_defconfig
+
+      - name: Record source and compiler versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe-logs
+          {
+            uname -a
+            clang --version
+            aarch64-linux-gnu-gcc --version
+            arm-linux-gnueabihf-gcc --version
+            git -C kernel rev-parse HEAD
+            git -C kernel diff --stat
+            df -h .
+            free -h
+          } > probe-logs/environment.txt 2>&1
+          cat probe-logs/environment.txt
+
+      - name: Configure patched ARM64 kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 \
+            CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+            lineage_a7y18lte_defconfig 2>&1 | tee probe-logs/config.log
+          grep -qx 'CONFIG_BPF_SYSCALL=y' kernel-out/.config
+          grep -qx 'CONFIG_BPF=y' kernel-out/.config
+          grep -qx 'CONFIG_SECURITY_SELINUX=y' kernel-out/.config
+          cp kernel-out/.config probe-logs/arm64-bpf-enabled.config
+
+      - name: Compile complete patched kernel Image
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 \
+            CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabihf- \
+            KCFLAGS=-Wno-error=enum-conversion Image 2>&1 | tee probe-logs/build.log
+          status=${PIPESTATUS[0]}
+          printf '%s\n' "$status" > probe-logs/build-exit-code.txt
+          exit "$status"
+
+      - name: Verify Image and actual BPF syscall object
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s kernel-out/arch/arm64/boot/Image
+          test -s kernel-out/vmlinux
+          test -s kernel-out/kernel/bpf/syscall.o
+          readelf -h kernel-out/kernel/bpf/syscall.o | tee probe-logs/bpf-syscall-elf-header.txt
+          readelf -h kernel-out/kernel/bpf/syscall.o | grep -q 'AArch64'
+          file kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-types.txt
+          sha256sum kernel-out/arch/arm64/boot/Image kernel-out/vmlinux kernel-out/kernel/bpf/syscall.o | tee probe-logs/output-sha256.txt
+          stat -c '%n %s bytes' kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-sizes.txt
+
+      - name: Preserve successful Image as NON-FLASHABLE research artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-bpf-enabled-arm64-Image-NOT-FLASHABLE
+          path: kernel-out/arch/arm64/boot/Image
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summarize exact compilation result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Galaxy A7 ARM64 4.4.302 kernel Image with BPF_SYSCALL'
+            echo 'Pinned source: 6020dfa8315134187f07ca903c9d2ed7ee0256f5'
+            echo "Build exit code: $(cat probe-logs/build-exit-code.txt 2>/dev/null || echo not-run)"
+            echo 'Image success means only kernel compilation, NOT Android 17 compatibility or device boot.'
+            echo 'No flashable boot.img or ROM is produced. No device is accessed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-bpf-enabled-Image-build-evidence
+          path: probe-logs/
+          if-no-files-found: warn
+          retention-days: 7
