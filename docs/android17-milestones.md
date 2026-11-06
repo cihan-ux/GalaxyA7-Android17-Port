@@ -15,6 +15,7 @@ This tracker separates actual compiler evidence, source checks and hardware func
 | G6b: Linux 4.4.302 BPF-enabled ARM64 kernel Image | PASS (compiled, non-flashable) | [CI 42235116992](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42235116992): 23,840,488 bytes, SHA-256 `069302468615291875fd6a3e6139a4af0f3c4e6ae02875a8348cd0c427f0cb79`; kernel ELF and BPF object verified |
 | G6c: Complete LineageOS 18.1 baseline ROM | NOT BUILT | Kernel Image is only one input; G3–G5 remain unresolved |
 | G7a: Android 17 NetBpfLoad kernel gate | BLOCKED (verified source requirement) | [Pinned LineageOS 24.0 loader](android17-netbpf-kernel-gate.md) requires >=5.10 for API 3700, >=5.15 for 3710; 4.4.302 fails |
+| G7c: Experimental Linux 6.15-rc1 Exynos7885 DTS research | SOURCE CANDIDATE, A8 ONLY | [Pinned source audit](exynos7885-mainline-kernel-candidate.md) and [legacy A7 board rev inventory](a7y18lte-legacy-dts-port-inventory.md). Real A8-only DTB compile [CI 42245058620](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42245058620) was initiated; SM-A750F board DTS and build/boot remain unverified. |
 | G7b: Android 17 VINTF/SELinux/HAL/vendor port | NOT VALIDATED | Old FCM3/SELinux, legacy HALs, boot/partition path and vendor symbols unresolved |
 | G8: Device boot/recovery | NOT STARTED | Explicit approval, backups, hardware and restoration plan required |
 

@@ -19,6 +19,12 @@ Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Previously recorded
 - [Device recovery/GSI notes](https://github.com/Hari-Pi/a7y18lte-Resources)
 - [LineageOS upstream](https://github.com/LineageOS/android)
 
+## Experimental modern Exynos7885 mainline investigation
+
+A pinned [experimental Linux 6.15-rc1 Exynos7885 tree](docs/exynos7885-mainline-kernel-candidate.md) contains a SoC DTS, clock/pinctrl support and a **Galaxy A8 / jackpotlte** board definition. It does **NOT** provide a verified Galaxy A7 / a7y18lte board port. A [real A8-only ARM64 DTB build probe](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42245058620) was started; inspect the linked run for its actual result rather than assuming success.
+
+The [pinned Galaxy A7 4.4.302 DTS revision inventory](docs/a7y18lte-legacy-dts-port-inventory.md) identifies distinct board rev00/rev01/rev03 source, GPIO, touch and fingerprint variants. Do not reuse A8-specific memory/pins, copy legacy `androidboot.selinux=permissive` bootargs or claim a successful DTB is an Android 17 ROM.
+
 ## Android 17 staged product source (experimental)
 
 A first LineageOS 24.0 **device-tree source delta** lives under
