@@ -1,0 +1,148 @@
+name: Exynos7885 Linux 6.15 mainline A8 DTB compile (NOT A7)
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/exynos7885-mainline-dtb-probe.yml'
+      - 'docs/exynos7885-mainline-kernel-candidate.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  a8-board-dtb-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install ARM64 toolchain and device-tree tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev device-tree-compiler
+
+      - name: Fetch exact experimental Linux 6.15-rc1 revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+
+      - name: Verify candidate is Exynos7885 A8 source NOT A7 board support
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^VERSION = 6$' kernel/Makefile
+          grep -Eq '^PATCHLEVEL = 15$' kernel/Makefile
+          grep -Eq '^SUBLEVEL = 0$' kernel/Makefile
+          grep -Eq '^EXTRAVERSION = -rc1$' kernel/Makefile
+          soc=kernel/arch/arm64/boot/dts/exynos/exynos7885.dtsi
+          board=kernel/arch/arm64/boot/dts/exynos/exynos7885-jackpotlte.dts
+          pinctrl=kernel/arch/arm64/boot/dts/exynos/exynos7885-pinctrl.dtsi
+          clk=kernel/drivers/clk/samsung/clk-exynos7885.c
+          test -s "$soc"
+          test -s "$pinctrl"
+          test -s "$clk"
+          grep -Fq '"samsung,exynos7885"' "$soc"
+          grep -Fq 'model = "Samsung Galaxy A8 (2018)";' "$board"
+          grep -Fq '"samsung,jackpotlte", "samsung,exynos7885"' "$board"
+          grep -Fq 'exynos7885-jackpotlte.dtb' kernel/arch/arm64/boot/dts/exynos/Makefile
+          grep -qx 'CONFIG_ARCH_EXYNOS=y' kernel/arch/arm64/configs/defconfig
+          if find kernel/arch/arm64/boot/dts/exynos -maxdepth 1 -iname '*a7y18lte*' | grep -q .; then
+            echo 'A7-specific DTS exists; manual re-audit required' >&2
+            exit 1
+          fi
+          echo 'Verified: Linux 6.15-rc1, Exynos7885 SoC, A8/jackpotlte DTS. NOT A7.'
+
+      - name: Record source and toolchain evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe-logs
+          {
+            git -C kernel rev-parse HEAD
+            clang --version
+            make --version
+            dtc --version
+            df -h .
+          } > probe-logs/environment.txt 2>&1
+          cat probe-logs/environment.txt
+
+      - name: Configure ARM64 Linux kernel for DTB build
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee probe-logs/config.log
+          grep -qx 'CONFIG_ARCH_EXYNOS=y' kernel-out/.config
+
+      - name: Build real ARM64 device tree blobs
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 dtbs \
+            2>&1 | tee probe-logs/build.log
+          status=$?
+          printf '%s\n' "$status" > probe-logs/build-exit-code.txt
+          exit "$status"
+
+      - name: Verify A8 output identification without claiming A7 compatibility
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dtb=kernel-out/arch/arm64/boot/dts/exynos/exynos7885-jackpotlte.dtb
+          test -s "$dtb"
+          model="$(fdtget -t s "$dtb" / model)"
+          compat="$(fdtget -t s "$dtb" / compatible)"
+          test "$model" = 'Samsung Galaxy A8 (2018)'
+          [[ "$compat" == *samsung,jackpotlte* ]]
+          [[ "$compat" == *samsung,exynos7885* ]]
+          [[ "$compat" != *a7y18lte* ]]
+          echo "model=$model" | tee probe-logs/board-identity.txt
+          echo "compatible=$compat" | tee -a probe-logs/board-identity.txt
+          sha256sum "$dtb" | tee probe-logs/dtb-sha256.txt
+          stat -c '%n %s bytes' "$dtb" | tee probe-logs/dtb-size.txt
+
+      - name: Preserve verified A8 research DTB, NOT FLASHABLE, NOT FOR A7
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-linux-615-A8-DTB-NOT-A7-NOT-FLASHABLE
+          path: kernel-out/arch/arm64/boot/dts/exynos/exynos7885-jackpotlte.dtb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Preserve evidence from success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-mainline-dtb-probe-evidence
+          path: probe-logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Summarize scope and exclusions
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Exynos7885 Linux 6.15-rc1 mainline DTS compilation'
+            echo 'Pinned revision c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c'
+            echo "DTB compile exit code: $(cat probe-logs/build-exit-code.txt 2>/dev/null || echo not-run)"
+            echo 'This is a Galaxy A8 jackpotlte board DTB, NOT SM-A750F/a7y18lte.'
+            echo 'No Android 17 kernel Image, boot.img, ROM or hardware validation.'
+          } >> "$GITHUB_STEP_SUMMARY"
