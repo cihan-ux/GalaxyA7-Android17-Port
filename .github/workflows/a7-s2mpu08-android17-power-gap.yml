@@ -50,10 +50,10 @@ jobs:
           drivers/regulator/Makefile reg-Makefile
           drivers/mfd/sec-core.c sec-core.c
           FILES
-          find power-evidence -type f -size 0 -print -quit | grep -qv . || {
+          if find power-evidence -type f -size 0 -print -quit | grep -q .; then
             echo 'Empty upstream source; cannot conclude support' >&2
             exit 1
-          }
+          fi
           sha256sum power-evidence/legacy/* power-evidence/modern/* \
             > power-evidence/source-sha256.txt
 
