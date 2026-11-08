@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Experimental eMMC / MMC0 source mapping from the *A7* legacy DTS.
+ * This includes the deliberately nonbootable base a7y18lte DTS.
+ *
+ * The independently pinned historical A7 common tree enables MMC0 at
+ * 0x13500000, IRQ 146 and uses sd0_clk/cmd/rdqs/bus1/bus4/bus8 pins.
+ * Linux 6.15 exynos7885.dtsi exposes this controller as &mmc_0.
+ *
+ * UNKNOWN: real A7 RAM map, reserved memory, power rails and modern
+ * board-specific peripheral compatibility. Do not boot or flash.
+ */
+
+#include "exynos7885-a7y18lte.dts"
+
+/ {
+	aliases {
+		mmc0 = &mmc_0;
+	};
+};
+
+&oscclk {
+	clock-frequency = <26000000>;
+};
+
+&mmc_0 {
+	status = "okay";
+	non-removable;
+	bus-width = <8>;
+	cap-mmc-highspeed;
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+	card-detect-delay = <200>;
+	samsung,dw-mshc-ciu-div = <3>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs
+		     &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+};
