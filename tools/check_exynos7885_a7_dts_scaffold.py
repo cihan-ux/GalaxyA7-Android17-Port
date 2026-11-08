@@ -28,10 +28,6 @@ def verify_dts(text: str) -> list[str]:
         failures.append("wrong A7/Exynos7885 compatible")
     if not re.search(r'\bchassis-type\s*=\s*"handset"\s*;', clean):
         failures.append("chassis-type missing")
-    for forbidden in [
-        r'\b(?:memory|reserved-memory)\s*\{|',  # normalized below
-    ]:
-        pass
     # These must remain absent until independently confirmed against the A7.
     unsafe = [
         (r'\bmemory(?:@[\da-fA-F]+)?\s*\{', "DRAM map"),
