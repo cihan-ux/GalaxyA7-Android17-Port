@@ -49,6 +49,11 @@ jobs:
           patch="$GITHUB_WORKSPACE/port/lineage-24.0/kernel/samsung/exynos7885/patches/0001-a7y18lte-bpf-syscall-research.patch"
           git -C kernel apply --check "$patch"
           git -C kernel apply "$patch"
+          # Reference from the user-working LineageOS 18.1 baseline: Linux 4.4 only.
+          usb_patch="$GITHUB_WORKSPACE/port/lineage-24.0/kernel/samsung/exynos7885/patches/0002-usb-dwc3-gadget-resume-unlock-reference.patch"
+          git -C kernel apply --check "$usb_patch"
+          git -C kernel apply "$usb_patch"
+          grep -A3 'if (dwc->gadget_driver && dwc->gadget_driver->resume)' kernel/drivers/usb/dwc3/gadget.c | grep -q 'spin_unlock(&dwc->lock)'
           python3 - <<'PY'
           from pathlib import Path
           changes = (
@@ -118,6 +123,8 @@ jobs:
           test -s kernel-out/arch/arm64/boot/Image
           test -s kernel-out/vmlinux
           test -s kernel-out/kernel/bpf/syscall.o
+          test -s kernel-out/drivers/usb/dwc3/gadget.o
+          readelf -h kernel-out/drivers/usb/dwc3/gadget.o | grep -q 'AArch64'
           readelf -h kernel-out/kernel/bpf/syscall.o | tee probe-logs/bpf-syscall-elf-header.txt
           readelf -h kernel-out/kernel/bpf/syscall.o | grep -q 'AArch64'
           file kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/output-types.txt
@@ -141,6 +148,8 @@ jobs:
             echo '## Galaxy A7 ARM64 4.4.302 kernel Image with BPF_SYSCALL'
             echo 'Pinned source: 6020dfa8315134187f07ca903c9d2ed7ee0256f5'
             echo "Build exit code: $(cat probe-logs/build-exit-code.txt 2>/dev/null || echo not-run)"
+            echo 'Source deltas: BPF_SYSCALL plus upstream Linux 4.4 DWC3 USB gadget resume lock fix.'
+            echo 'DWC3 gadget.o is required to exist and be AArch64 after compile.'
             echo 'Image success means only kernel compilation, NOT Android 17 compatibility or device boot.'
             echo 'No flashable boot.img or ROM is produced. No device is accessed.'
           } >> "$GITHUB_STEP_SUMMARY"
