@@ -2,7 +2,7 @@
 
 **Status: source-level Android 17 prototype, NOT buildable or flashable as an Android 17 ROM.** A pinned historical Linux 4.4.302 ARM64 kernel **has** been compiled, including a BPF-enabled variant, but Android 17 runtime/kernel support is **not** established.
 
-Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Previously recorded handset baseline: Android 10, firmware A750FXXU5CVG1 (U5), Linux 4.4.177, arm64 ABI. No phone has been accessed.
+Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Historical stock baseline: Android 10, firmware A750FXXU5CVG1 (U5), Linux 4.4.177, arm64 ABI. The user subsequently confirmed that [LineageOS 18.1 build 2026-11-08 (Android 11)](docs/working-lineage18-20261108-reference.md) works on the handset. That is useful legacy source evidence, **not proof of Android 17 compatibility**. This repository has not accessed the phone.
 
 ## Verified kernel build milestone
 
@@ -23,7 +23,9 @@ Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Previously recorded
 
 A pinned [experimental Linux 6.15-rc1 Exynos7885 tree](docs/exynos7885-mainline-kernel-candidate.md) contains a SoC DTS, clock/pinctrl support and a **Galaxy A8 / jackpotlte** board definition. It does **NOT** provide a verified Galaxy A7 / a7y18lte hardware port. The [real A8-only ARM64 DTB build probe](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42245058620) was successful **for A8 only**.
 
-A newly staged [A7-specific SoC/DTB scaffold](docs/a7y18lte-linux615-dtb-scaffold.md) **compiled as a real ARM64 DTB** in [CI 42503704081](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42503704081) with model `SM-A750F` and compatible `samsung,a7y18lte`. Its deliberately missing memory and board wiring make it **NOT BOOTABLE / NOT FLASHABLE**. An independent [A7-derived MMC0/eMMC mapping lab](docs/a7y18lte-emmc-modern-source-mapping.md) is staged for separate compilation; source mapping is not proof of working storage or a bootable modern kernel.
+A newly staged [A7-specific SoC/DTB scaffold](docs/a7y18lte-linux615-dtb-scaffold.md) **compiled as a real ARM64 DTB** in [CI 42503704081](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42503704081) with model `SM-A750F` and compatible `samsung,a7y18lte`. Its deliberately missing memory and board wiring make it **NOT BOOTABLE / NOT FLASHABLE**. An independent [A7-derived MMC0/eMMC mapping lab](docs/a7y18lte-emmc-modern-source-mapping.md) compiled in [CI 42504144337](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42504144337), proving DTB syntax and the A7-source controller mapping only, NOT functioning storage or a bootable modern kernel. A separate [power/volume GPIO-keys lab](docs/a7y18lte-gpio-keys-linux615-mapping.md) now has independent A7 legacy source checks and a real DTB compile test; electrical polarity and function on SM-A750F remain unverified.
+
+A new [Linux 6.15 ARM64 kernel Image source experiment](docs/exynos7885-linux615-android-kernel-first-compile.md) configures Binder/binderfs, SELinux and eBPF alongside Exynos MMC, clock and pinctrl sources; [CI 42505758584](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42505758584) is the authoritative build result. Passing version/config source checks alone never proves a bootable Image, Android 17 support or modern vendor compatibility.
 
 The user reports that the [2026-11-08 LineageOS 18.1 Android 11 release](docs/working-lineage18-20261108-reference.md) boots successfully on SM-A750F. Both the source-traced USB DWC3 resume fix and encrypted-data first-boot TEE SELinux fix are documented; no phone was accessed through this repository.
 
