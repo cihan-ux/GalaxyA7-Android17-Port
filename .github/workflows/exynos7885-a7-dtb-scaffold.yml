@@ -5,7 +5,9 @@ name: Galaxy A7 experimental Linux 6.15 DTB syntax build (NOT BOOTABLE)
       - dev/evidence-based-source-audit
     paths:
       - '.github/workflows/exynos7885-a7-dtb-scaffold.yml'
-      - 'port/linux-6.15/**'
+      - 'port/linux-6.15/arch/arm64/boot/dts/exynos/**'
+      - 'tools/check_exynos7885_a7_keys_stage.py'
+      - 'tests/test_exynos7885_a7_keys_stage.py'
       - 'tools/check_exynos7885_a7_emmc_stage.py'
       - 'tests/test_exynos7885_a7_emmc_stage.py'
       - 'tools/check_exynos7885_a7_dts_scaffold.py'
@@ -27,8 +29,10 @@ jobs:
         run: |
           python3 tools/check_exynos7885_a7_dts_scaffold.py
           python3 tools/check_exynos7885_a7_emmc_stage.py
+          python3 tools/check_exynos7885_a7_keys_stage.py
           python3 -m unittest discover -s tests -p test_exynos7885_a7_dts_scaffold.py -v
           python3 -m unittest discover -s tests -p test_exynos7885_a7_emmc_stage.py -v
+          python3 -m unittest discover -s tests -p test_exynos7885_a7_keys_stage.py -v
 
       - name: Install ARM64 kernel DTB prerequisites
         shell: bash
@@ -61,7 +65,9 @@ jobs:
              kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dts
           cp port/linux-6.15/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dts \
              kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dts
-          printf '\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte.dtb\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte-emmc-lab.dtb\n' \
+          cp port/linux-6.15/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dts \
+             kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dts
+          printf '\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte.dtb\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte-emmc-lab.dtb\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte-keys-lab.dtb\n' \
              >> kernel/arch/arm64/boot/dts/exynos/Makefile
           git -C kernel diff --check
           mkdir -p probe-logs
@@ -110,6 +116,19 @@ jobs:
           fi
           echo 'eMMC lab MMC0=okay; 8-bit bus; RAM=ABSENT; NOT BOOTABLE' | tee probe-logs/a7-emmc-lab.txt
           sha256sum "$lab" | tee probe-logs/a7-emmc-lab-sha256.txt
+          keys=kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dtb
+          test -s "$keys"
+          test "$(fdtget -t s "$keys" / model)" = "$model"
+          test "$(fdtget -t s "$keys" /soc@0/mmc@13500000 status)" = 'okay'
+          test "$(fdtget -t x "$keys" /gpio-keys/volume-up linux,code)" = '73'
+          test "$(fdtget -t x "$keys" /gpio-keys/volume-down linux,code)" = '72'
+          test "$(fdtget -t x "$keys" /gpio-keys/power linux,code)" = '74'
+          if fdtget "$keys" /memory reg >/dev/null 2>&1; then
+            echo 'A7 GPIO-keys lab has unverified memory' >&2
+            exit 1
+          fi
+          echo 'A7 gpa1 power/volume key codes staged for syntax only' | tee probe-logs/a7-keys-lab.txt
+          sha256sum "$keys" | tee probe-logs/a7-keys-lab-sha256.txt
 
       - name: Preserve research-only DTS proof (NEVER FLASH)
         if: success()
@@ -119,6 +138,7 @@ jobs:
           path: |
             kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dtb
             kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dtb
+            kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dtb
           retention-days: 7
 
       - name: Upload DTB build evidence
@@ -138,7 +158,7 @@ jobs:
             echo '## SM-A750F experimental Exynos7885 Linux 6.15-rc1 DTS syntax probe'
             echo 'This intentionally lacks A7 memory/reserved-memory, regulators, board pins and peripherals.'
             echo 'Successful DTB compilation proves only source and identity syntax.'
-            echo 'Both the base DTB and isolated eMMC lab DTB are NEVER FLASHABLE.'
+            echo 'All three A7 DTBs (minimal, MMC and GPIO keys) are NEVER FLASHABLE.'
             echo 'The eMMC lab only proves a source-matched controller node can compile.'
             echo 'Neither DTB boots Android 17 or any other OS.'
           } >> "$GITHUB_STEP_SUMMARY"
