@@ -11,7 +11,7 @@ Hardware source: [Samsung A7 historical regulator source (GPL-2.0-or-later)](htt
 | `LDO2` → `vqmmc` (channel 2) | **1** | `0x2D` | 25,000 µV | 1,800,000–3,375,000 µV | 0–63 |
 | `LDO35` → `vmmc` (channel 35) | **16** | `0x4F` | 25,000 µV | 1,800,000–3,000,000 µV | 0–48 |
 
-The legacy `enum S2MPU08_regulators` skips disabled LDO15–LDO32 definitions, so channel 35 has enum ID **16**, not 35 (channel 2 has enum ID **1**, not 2). The chip supports 64 selector values per LDO, but the **A7 board** constrains LDO35 to a lower maximum; we must not interpret the full 6-bit range as permission to exceed 3.0 V. Neither rail is proven to operate on real hardware without ACPM transport and physical electrical validation.
+The legacy `enum S2MPU08_regulators` skips disabled LDO15–LDO32 definitions, so channel 35 has enum ID **16**, not 35 (channel 2 has enum ID **1**, not 2). [The new source-level enum gate](../tools/check_s2mpu08_a7_legacy_enum.py) parses the **actual pinned Samsung header** and fails if those mappings or the voltage register definitions change. The chip supports 64 selector values per LDO, but the **A7 board** constrains LDO35 to a lower maximum; we must not interpret the full 6-bit range as permission to exceed 3.0 V. Neither rail is proven to operate on real hardware without ACPM transport and physical electrical validation.
 
 ## Staged source and proof
 

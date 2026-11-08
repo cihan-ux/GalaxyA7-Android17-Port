@@ -8,6 +8,8 @@ name: Linux 6.15 S2MPU08 LDO2/LDO35 voltage-only ARM64 source compile
       - 'tests/native/test_s2mpu08_a7_voltage_lab.c'
       - 'tests/test_s2mpu08_a7_voltage_lab.py'
       - 'tools/check_s2mpu08_a7_voltage_lab.py'
+      - 'tools/check_s2mpu08_a7_legacy_enum.py'
+      - 'tests/test_s2mpu08_a7_legacy_enum.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +29,18 @@ jobs:
           set -euo pipefail
           python3 tools/check_s2mpu08_a7_voltage_lab.py
           python3 -m unittest discover -s tests -p test_s2mpu08_a7_voltage_lab.py -v
+          python3 -m unittest discover -s tests -p test_s2mpu08_a7_legacy_enum.py -v
+
+      - name: Verify sparse enum and voltage registers from immutable A7 kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 \
+            https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5/include/linux/mfd/samsung/s2mpu08-private.h \
+            -o "$RUNNER_TEMP/s2mpu08-legacy.h"
+          test -s "$RUNNER_TEMP/s2mpu08-legacy.h"
+          python3 tools/check_s2mpu08_a7_legacy_enum.py \
+            --legacy-header "$RUNNER_TEMP/s2mpu08-legacy.h"
 
       - name: Compile and execute actual host C voltage selector logic
         shell: bash
