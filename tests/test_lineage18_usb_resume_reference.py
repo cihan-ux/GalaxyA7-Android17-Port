@@ -27,6 +27,17 @@ class WorkingLineage18USBReferenceTests(unittest.TestCase):
         self.assertEqual(self.meta["kernel_source"]["usb_resume_fix_commit"],
                          "2a074fb85d78d065df5c529d7c0d748454bcaa3a")
 
+    def test_first_boot_fix_is_already_in_pinned_common_source(self):
+        import xml.etree.ElementTree as ET
+        source = self.meta["first_boot_source"]
+        self.assertEqual(source["modified_path"], "sepolicy/vendor/tee.te")
+        self.assertEqual(source["new_rule"], "allow tee unlabeled:dir search;")
+        manifest = ET.parse(ROOT / "manifests/lineage-18.1-research.xml").getroot()
+        common = next(p for p in manifest.findall("project")
+                      if p.attrib["path"] == "device/samsung/exynos7885-common")
+        self.assertEqual(source["commit"], common.attrib["revision"])
+        self.assertEqual(source["repository"], "exynos7885-dev/" + common.attrib["name"])
+
     def test_reference_patch_changes_only_legacy_usb_resume_callback(self):
         p = self.patch.read_text(encoding="utf-8")
         self.assertIn("Subject: [PATCH] usb: dwc3: gadget: release spin lock", p)
