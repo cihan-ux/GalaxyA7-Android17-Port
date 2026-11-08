@@ -1,0 +1,10 @@
+# Linux 6.15-rc1 only, applied on top of arm64 defconfig.
+# Android 17 source research: NO board boot support or VINTF/SELinux proof.
+# Do not downgrade security settings or impersonate a supported Android kernel.
+CONFIG_BPF_SYSCALL=y
+CONFIG_BPF_JIT=y
+CONFIG_CGROUP_BPF=y
+CONFIG_ANDROID_BINDER_IPC=y
+CONFIG_ANDROID_BINDERFS=y
+CONFIG_SECURITY_NETWORK=y
+CONFIG_SECURITY_SELINUX=y
