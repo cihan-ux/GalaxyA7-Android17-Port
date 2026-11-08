@@ -21,10 +21,18 @@ The fragment deliberately **does not** suppress security enforcement, VINTF chec
 1. Checks out the immutable experimental 6.15 source.
 2. Runs ARM64 `defconfig`, stages the reviewed settings with kernel `scripts/config` and applies `olddefconfig`.
 3. Fetches the immutable Android 17 `NetBpfLoad.cpp` and `BpfUtils.h` to validate version requirements for API 3700 and 3710.
-4. Attempts a **real ARM64 `Image` compilation** using Clang/LLVM.
-5. On success, inspects kernel objects for Exynos MMC, clock, pinctrl, Android Binder/binderfs and SELinux; records checksums and logs.
+4. Runs a **real ARM64 `Image` compilation** using Clang/LLVM.
+5. Verifies ELF kernel objects for Exynos MMC, clock, pinctrl, Android Binder/binderfs and SELinux; records checksums and logs.
 
-This is a proper compiler experiment; it can fail, and such a failure is an engineering result to analyze. A green Python test or version check is NOT an Image build pass.
+**Actual CI result: COMPLETED SUCCESS** — [run 42505758584](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42505758584), pinned kernel commit `c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c`, Linux 6.15-rc1. GitHub Actions log records:
+
+- `Image`: **39,526,912 bytes**, SHA-256 **`160355fbd5dd321112cf791fe103db4d76d7fe6f6e34e0cb760e10c6ca840755`**.
+- ARM64 `vmlinux`: **419,695,136 bytes**.
+- **15 evaluated Kconfig dependencies passed**, including Binder, binderfs, SELinux, kernel BPF, Exynos MMC, Exynos clocks and pinctrl.
+- Android 17 API 3700 and 3710 passed the **kernel version threshold only** (required >=5.10 and >=5.15 respectively). No runtime feature checks were run.
+- Exynos MMC, clock, pinctrl, Binder/binderfs and SELinux compiled object files were all checked as AArch64 ELF artifacts. The Image artifact and compiler logs were uploaded to the CI run with explicit NOT-FLASHABLE labels.
+
+The full Image compile is a genuine compiler milestone, not proof of a working kernel for SM-A750F or any complete Android 17 ROM. In particular, the [A7 S2MPU08 power/ACPM driver integration gap](a7y18lte-s2mpu08-power-port-blocker.md) remains **source-verified and unresolved**.
 
 ## Explicit excluded scope
 
