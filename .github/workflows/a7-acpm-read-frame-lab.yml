@@ -1,0 +1,139 @@
+name: Galaxy A7 Exynos7885 ACPM read-frame + GS101 platform mismatch (NOT BOOTABLE)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-read-frame-lab.yml'
+      - 'port/linux-6.15/drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.*'
+      - 'tools/check_a7_acpm_bridge_gate.py'
+      - 'tests/test_a7_acpm_bridge_gate.py'
+      - 'tests/native/test_s2mpu08_a7_acpm_frame.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware-transport-research:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout bounded non-I/O ACPM research
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Host test 512 pure C read frame vectors and negative cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p acpm-evidence
+          cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 \
+            -Iport/linux-6.15/drivers/firmware/samsung \
+            port/linux-6.15/drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.c \
+            tests/native/test_s2mpu08_a7_acpm_frame.c \
+            -o "$RUNNER_TEMP/a7-acpm-read-frame-host"
+          "$RUNNER_TEMP/a7-acpm-read-frame-host" \
+            | tee acpm-evidence/host-read-frame-test.txt
+          python3 -m unittest discover -s tests -p test_a7_acpm_bridge_gate.py -v
+
+      - name: Fetch immutable Samsung Android 11 and Linux 6.15 ACPM source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p acpm-evidence/old acpm-evidence/modern
+          old=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          new=https://raw.githubusercontent.com/Mollomm1/linux-exynos7885/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          while IFS=' ' read -r path file; do
+            curl -fLsS --retry 3 "$old/$path" -o "acpm-evidence/old/$file"
+          done <<'FILES'
+          arch/arm64/boot/dts/exynos/exynos7885.dtsi exynos7885.dtsi
+          arch/arm64/boot/dts/exynos/exynos7885-a7y18lte_common.dtsi a7-common.dtsi
+          include/soc/samsung/acpm_mfd.h acpm_mfd.h
+          drivers/soc/samsung/acpm/acpm_mfd.c acpm_mfd.c
+          FILES
+          while IFS=' ' read -r path file; do
+            curl -fLsS --retry 3 "$new/$path" -o "acpm-evidence/modern/$file"
+          done <<'FILES'
+          drivers/firmware/samsung/exynos-acpm.c exynos-acpm.c
+          drivers/firmware/samsung/exynos-acpm-pmic.c exynos-acpm-pmic.c
+          arch/arm64/boot/dts/exynos/exynos7885.dtsi exynos7885.dtsi
+          FILES
+          if find acpm-evidence -type f -size 0 -print -quit | grep -q .; then
+            echo 'Empty source file — must not infer compatibility.' >&2
+            exit 1
+          fi
+          sha256sum acpm-evidence/old/* acpm-evidence/modern/* \
+            > acpm-evidence/pinned-source-sha256.txt
+
+      - name: Confirm Exynos7885 firmware transport is still BLOCKED (expected)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_a7_acpm_bridge_gate.py \
+            --old-soc acpm-evidence/old/exynos7885.dtsi \
+            --old-board acpm-evidence/old/a7-common.dtsi \
+            --old-mfd-h acpm-evidence/old/acpm_mfd.h \
+            --old-acpm-mfd acpm-evidence/old/acpm_mfd.c \
+            --modern-acpm acpm-evidence/modern/exynos-acpm.c \
+            --modern-pmic acpm-evidence/modern/exynos-acpm-pmic.c \
+            --modern-soc acpm-evidence/modern/exynos7885.dtsi \
+            | tee acpm-evidence/transport-blocker.txt
+
+      - name: Install Linux ARM64 compiler prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch immutable Linux 6.15 Exynos7885 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+
+      - name: Compile real Linux 6.15 AArch64 ACPM research object without binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp port/linux-6.15/drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.* \
+            kernel/drivers/firmware/samsung/
+          ! grep -q 's2mpu08-a7-acpm-frame-lab' kernel/drivers/firmware/samsung/Makefile
+          make -C kernel O="$GITHUB_WORKSPACE/acpm-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee acpm-evidence/defconfig.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/acpm-out" ARCH=arm64 LLVM=1 \
+            drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.o \
+            2>&1 | tee acpm-evidence/arm64-build.log
+          obj=acpm-out/drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.o
+          test -s "$obj"
+          readelf -h "$obj" | grep -q 'Machine:.*AArch64'
+          sha256sum "$obj" > acpm-evidence/acpm-arm64-object-sha256.txt
+
+      - name: Save source comparison and compiler evidence (NO flashable file)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a7-s2mpu08-ACPM-PACKET-READ-ONLY-NOT-DRIVER
+          path: |
+            acpm-evidence/*.txt
+            acpm-evidence/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report exact research scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## SM-A750F / Exynos7885 ACPM first protocol code'
+            echo 'This tests an inert, READ-only ACPM PMIC command format and an AArch64 compile.'
+            echo 'Current Linux 6.15 ACPM platform implementation is GS101-specific (0xa000 SRAM initdata), not A7-compatible.'
+            echo 'Old A7: SRAM initdata 0x4b80, AP2APM mailbox 0x11c40000, SRAM 0x02052000; requires verified port.'
+            echo 'No live ACPM messages, S2MPU08 driver binding, voltage writes, A7 boot or flashable ROM.'
+          } >> "$GITHUB_STEP_SUMMARY"
