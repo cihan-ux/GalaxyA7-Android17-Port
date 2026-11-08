@@ -1,0 +1,117 @@
+name: Galaxy A7 Linux 6.15 targeted Exynos + Android driver object compile
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-linux615-targeted-driver-objects.yml'
+      - 'port/linux-6.15/config/**'
+      - 'tools/check_exynos7885_linux615_android_config.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  arm64-targeted-driver-objects:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source audit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install ARM64 build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch exact modern Exynos7885 source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          mkdir -p object-evidence
+          git -C kernel rev-parse HEAD > object-evidence/source-sha.txt
+          clang --version > object-evidence/clang-version.txt
+
+      - name: Configure real ARM64 Android research kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/obj-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee object-evidence/defconfig.log
+          python3 tools/check_exynos7885_linux615_android_config.py stage \
+            --config obj-out/.config --config-script kernel/scripts/config
+          make -C kernel O="$GITHUB_WORKSPACE/obj-out" ARCH=arm64 LLVM=1 olddefconfig \
+            2>&1 | tee object-evidence/olddefconfig.log
+          for option in BPF_SYSCALL CGROUP_BPF MMC_DW_EXYNOS EXYNOS_ARM64_COMMON_CLK \
+             PINCTRL_EXYNOS_ARM64 ANDROID_BINDER_IPC ANDROID_BINDERFS SECURITY_SELINUX; do
+            grep -qx "CONFIG_$option=y" obj-out/.config
+          done
+
+      - name: Compile actual Exynos MMC, clock, pinctrl, Binder, SELinux and BPF objects
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          make -C kernel -j4 O="$GITHUB_WORKSPACE/obj-out" ARCH=arm64 LLVM=1 \
+            drivers/mmc/host/dw_mmc-exynos.o \
+            drivers/clk/samsung/clk-exynos7885.o \
+            drivers/pinctrl/samsung/pinctrl-exynos-arm64.o \
+            drivers/android/binder.o \
+            drivers/android/binderfs.o \
+            security/selinux/hooks.o \
+            kernel/bpf/syscall.o \
+            2>&1 | tee object-evidence/build.log
+          result=${PIPESTATUS[0]}
+          printf '%s\n' "$result" > object-evidence/build-exit.txt
+          exit "$result"
+
+      - name: Confirm all seven objects are genuine ARM64 compiler outputs
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in \
+            drivers/mmc/host/dw_mmc-exynos.o \
+            drivers/clk/samsung/clk-exynos7885.o \
+            drivers/pinctrl/samsung/pinctrl-exynos-arm64.o \
+            drivers/android/binder.o \
+            drivers/android/binderfs.o \
+            security/selinux/hooks.o \
+            kernel/bpf/syscall.o; do
+            test -s "obj-out/$path"
+            readelf -h "obj-out/$path" | grep -q 'Machine:.*AArch64'
+            sha256sum "obj-out/$path" | tee -a object-evidence/objects-sha256.txt
+          done
+          echo 'PASS: all seven real ARM64 object files compiled; no A7 runtime or PMIC support validated.' \
+            | tee object-evidence/conclusion.txt
+
+      - name: Preserve targeted build evidence even on failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux615-a7-ARM64-exynos-binder-selinux-bpf-object-evidence
+          path: object-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Document nonbootable scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Targeted Exynos7885 Linux 6.15 ARM64 object compilation'
+            echo "Compile exit: $(cat object-evidence/build-exit.txt 2>/dev/null || echo not-run)"
+            echo 'Compiling ARM64 driver objects is stronger than file-presence checks.'
+            echo 'It does NOT mean A7/SM-A750F kernel Image, eMMC I/O, PMIC S2MPU08, screen, modem or Android 17 boots.'
+            echo 'Known S2MPU08 regulator/ACPM driver gap remains; no phone access, no flashable artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"
