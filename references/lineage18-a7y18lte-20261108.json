@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "purpose": "User-reported working LineageOS 18.1 reference, not an Android 17 port or proof of binary-to-source reproducibility",
+  "target": {
+    "model": "SM-A750F",
+    "codename": "a7y18lte",
+    "soc": "Exynos 7885"
+  },
+  "release": {
+    "repository": "A2L5E0X1/lineage",
+    "tag": "a7y18lte-20261108",
+    "published_at_utc": "2026-11-08T02:21:31Z",
+    "filename": "lineage-18.1-20261108-UNOFFICIAL-A2L5E0X1-a7y18lte.zip",
+    "size_bytes": 742826234,
+    "sha256": "926cd48efb2a4b024e85bec06cdfedcbb9ca34ed4db9c458c6949b8a606d6c0d",
+    "version": "18.1",
+    "url": "https://github.com/A2L5E0X1/lineage/releases/download/a7y18lte-20261108/lineage-18.1-20261108-UNOFFICIAL-A2L5E0X1-a7y18lte.zip"
+  },
+  "kernel_source": {
+    "repository": "exynos7885-dev/kernel_samsung_exynos7885",
+    "base_commit": "6020dfa8315134187f07ca903c9d2ed7ee0256f5",
+    "usb_resume_fix_commit": "2a074fb85d78d065df5c529d7c0d748454bcaa3a",
+    "modified_path": "drivers/usb/dwc3/gadget.c",
+    "reference_patch": "port/lineage-24.0/kernel/samsung/exynos7885/patches/0002-usb-dwc3-gadget-resume-unlock-reference.patch"
+  },
+  "evidence_limits": [
+    "Upstream source fix predates the published build, but the release has no independently verified build manifest tying ZIP bytes to this kernel commit.",
+    "LineageOS 18.1 on a7y18lte does not establish Android 17 kernel/VINTF/SELinux compatibility.",
+    "No proprietary binaries are checked into this project.",
+    "The patch is Linux 4.4.302-specific and is not an automatically applicable Android 17 kernel patch."
+  ]
+}
