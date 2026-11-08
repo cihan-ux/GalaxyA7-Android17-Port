@@ -21,7 +21,11 @@ Target: Samsung Galaxy A7 (2018), **a7y18lte**, Exynos 7885. Previously recorded
 
 ## Experimental modern Exynos7885 mainline investigation
 
-A pinned [experimental Linux 6.15-rc1 Exynos7885 tree](docs/exynos7885-mainline-kernel-candidate.md) contains a SoC DTS, clock/pinctrl support and a **Galaxy A8 / jackpotlte** board definition. It does **NOT** provide a verified Galaxy A7 / a7y18lte board port. A [real A8-only ARM64 DTB build probe](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42245058620) was started; inspect the linked run for its actual result rather than assuming success.
+A pinned [experimental Linux 6.15-rc1 Exynos7885 tree](docs/exynos7885-mainline-kernel-candidate.md) contains a SoC DTS, clock/pinctrl support and a **Galaxy A8 / jackpotlte** board definition. It does **NOT** provide a verified Galaxy A7 / a7y18lte hardware port. The [real A8-only ARM64 DTB build probe](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42245058620) was successful **for A8 only**.
+
+A newly staged [A7-specific SoC/DTB scaffold](docs/a7y18lte-linux615-dtb-scaffold.md) **compiled as a real ARM64 DTB** in [CI 42503704081](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42503704081) with model `SM-A750F` and compatible `samsung,a7y18lte`. Its deliberately missing memory and board wiring make it **NOT BOOTABLE / NOT FLASHABLE**. An independent [A7-derived MMC0/eMMC mapping lab](docs/a7y18lte-emmc-modern-source-mapping.md) is staged for separate compilation; source mapping is not proof of working storage or a bootable modern kernel.
+
+The user reports that the [2026-11-08 LineageOS 18.1 Android 11 release](docs/working-lineage18-20261108-reference.md) boots successfully on SM-A750F. Both the source-traced USB DWC3 resume fix and encrypted-data first-boot TEE SELinux fix are documented; no phone was accessed through this repository.
 
 The [pinned Galaxy A7 4.4.302 DTS revision inventory](docs/a7y18lte-legacy-dts-port-inventory.md) identifies distinct board rev00/rev01/rev03 source, GPIO, touch and fingerprint variants. Do not reuse A8-specific memory/pins, copy legacy `androidboot.selinux=permissive` bootargs or claim a successful DTB is an Android 17 ROM.
 
