@@ -14,7 +14,9 @@ The pinned [historical PMIC MFD core](https://github.com/exynos7885-dev/kernel_s
 
 The pinned [Linux 6.15-rc1 Exynos7885 experiment](https://github.com/Mollomm1/linux-exynos7885/tree/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c) contains Exynos MMC, clocks, pinctrl, and [Samsung SEC PMIC core](https://github.com/Mollomm1/linux-exynos7885/blob/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c/drivers/mfd/sec-core.c) with support for other S2MPS/S2MPU models such as **S2MPU02 and S2MPU05**. Its inspected `drivers/mfd/{Kconfig,Makefile}` and `drivers/regulator/{Kconfig,Makefile}` **do not define** `MFD_S2MPU08` or `REGULATOR_S2MPU08`. Its SEC core does not match the legacy A7 `samsung,s2mpu08mfd` compatible.
 
-This is a missing **board power driver integration**, not proof no possible external S2MPU08 implementation exists. Kernel 6.15 version compliance alone cannot solve the missing PMIC transport and regulator control.
+The Linux 6.15 source **does contain** a generic Samsung ACPM PMIC protocol implementation at [`drivers/firmware/samsung/exynos-acpm-pmic.c`](https://github.com/Mollomm1/linux-exynos7885/blob/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c/drivers/firmware/samsung/exynos-acpm-pmic.c), but its [ACPM controller implementation](https://github.com/Mollomm1/linux-exynos7885/blob/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c/drivers/firmware/samsung/exynos-acpm.c) matches only `google,gs101-acpm-ipc` and uses GS101-specific SRAM initdata `0xA000`. The A7 historical firmware requires a distinct `samsung,exynos-acpm-ipc` controller and `0x4B80` initdata offset. The first [read-only PMIC message encoder source port](a7-s2mpu08-acpm-frame-lab.md) tests common lower message fields but does not resolve the SoC-specific firmware transport.
+
+This is a missing **A7 board power driver and ACPM controller integration**, not proof no reusable ACPM protocol pieces exist. Kernel 6.15 version compliance alone cannot solve the missing PMIC transport and regulator control.
 
 ## Reproducible blocker test
 
@@ -28,7 +30,7 @@ A green check means **confirmed blocker**, not compatibility. These sources do n
 ## Engineering actions before a bootable board DTS
 
 1. Review Samsung S2MPU08 MFD and regulator GPL source/headers for license, portability and modern `regmap`/platform/interrupt APIs; verify transport dependencies (ACPM or equivalent).
-2. Determine what Samsung ACPM IPC and SPEEDY bus support exists in the modern kernel. A compatible PMIC I2C ID without those transports is inadequate.
+2. Port the verified Exynos7885 ACPM controller (`samsung,exynos-acpm-ipc`, 0x4B80 SRAM initdata, model-specific mailbox and channel 2), proving its firmware/DT layout before wiring the new ACPM PMIC ops. Do not substitute the GS101-only controller or map unvalidated SRAM memory. A compatible PMIC I2C ID without these transports is inadequate.
 3. Implement real S2MPU08 regulator and IRQ logic preserving chip revision 0 LDO35/LDO36 handling; compile actual driver objects before enabling a physical board node.
 4. Validate the modern regulator bindings against the A7 source and then trace MMC power supplies, remaining buck/ldo dependencies, suspend/resume and charging.
 5. Only after verified A7 memory carveouts, power + storage drivers, display, security policy and full ROM platform dependencies should hardware flashing be considered.
