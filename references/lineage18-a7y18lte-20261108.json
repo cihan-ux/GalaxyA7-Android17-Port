@@ -28,5 +28,13 @@
     "LineageOS 18.1 on a7y18lte does not establish Android 17 kernel/VINTF/SELinux compatibility.",
     "No proprietary binaries are checked into this project.",
     "The patch is Linux 4.4.302-specific and is not an automatically applicable Android 17 kernel patch."
-  ]
+  ],
+  "first_boot_source": {
+    "repository": "exynos7885-dev/device_samsung_exynos7885-common",
+    "commit": "f2ce8d2093711026f021cba7036334d381d455ef",
+    "modified_path": "sepolicy/vendor/tee.te",
+    "new_rule": "allow tee unlabeled:dir search;",
+    "already_pinned_in_research_manifest": true,
+    "android17_adoption": "Not ported; requires SELinux labeling and least-privilege review against modern neverallow rules"
+  }
 }
