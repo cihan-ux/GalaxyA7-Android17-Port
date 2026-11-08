@@ -7,9 +7,13 @@
 #ifndef S2MPU08_A7_VOLTAGE_LAB_H
 #define S2MPU08_A7_VOLTAGE_LAB_H
 
-#define S2MPU08_A7_LDO2_ID             2U
-#define S2MPU08_A7_LDO35_ID            35U
-#define S2MPU08_A7_LDO36_ID            36U
+/* Human LDO channel numbers are NOT Samsung's sparse legacy enum IDs. */
+#define S2MPU08_A7_LDO2_CHANNEL          2U
+#define S2MPU08_A7_LDO35_CHANNEL         35U
+#define S2MPU08_A7_LDO36_CHANNEL         36U
+/* Legacy enum skips inactive LDO15..LDO32 in this historical kernel. */
+#define S2MPU08_A7_LDO2_LEGACY_ENUM_ID   1U
+#define S2MPU08_A7_LDO35_LEGACY_ENUM_ID  16U
 #define S2MPU08_A7_LDO2_VSEL_REG       0x2dU
 #define S2MPU08_A7_LDO35_VSEL_REG      0x4fU
 #define S2MPU08_A7_VSEL_MASK           0x3fU
@@ -24,9 +28,9 @@
 static inline unsigned int s2mpu08_a7_board_max_uv(unsigned int rail)
 {
 	switch (rail) {
-	case S2MPU08_A7_LDO2_ID:
+	case S2MPU08_A7_LDO2_CHANNEL:
 		return S2MPU08_A7_LDO2_BOARD_MAX_UV;
-	case S2MPU08_A7_LDO35_ID:
+	case S2MPU08_A7_LDO35_CHANNEL:
 		return S2MPU08_A7_LDO35_BOARD_MAX_UV;
 	default:
 		return 0;
@@ -72,6 +76,6 @@ static inline int s2mpu08_a7_needs_rev0_ldo_guard(unsigned int pmic_rev,
 						    unsigned int rail)
 {
 	return pmic_rev == 0 &&
-	       (rail == S2MPU08_A7_LDO35_ID || rail == S2MPU08_A7_LDO36_ID);
+	       (rail == S2MPU08_A7_LDO35_CHANNEL || rail == S2MPU08_A7_LDO36_CHANNEL);
 }
 #endif

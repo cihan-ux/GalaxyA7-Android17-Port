@@ -6,17 +6,17 @@ Hardware source: [Samsung A7 historical regulator source (GPL-2.0-or-later)](htt
 
 ## Exact model-specific voltage math
 
-| A7 rail | Legacy regulator ID | VSEL register | Selector | LDO step | A7 voltage constraint | Allowed selector range |
-| --- | --- | --- | --- | --- | --- | --- |
-| `LDO2` → `vqmmc` | 2 | `0x2D` | 6-bit (`0x3F`) | 25,000 µV | 1,800,000–3,375,000 µV | 0–63 |
-| `LDO35` → `vmmc` | 35 | `0x4F` | 6-bit (`0x3F`) | 25,000 µV | 1,800,000–3,000,000 µV | 0–48 |
+| A7 rail/channel | Historical enum ID | VSEL register | Step | A7 voltage constraint | Allowed selector range |
+| --- | --- | --- | --- | --- | --- |
+| `LDO2` → `vqmmc` (channel 2) | **1** | `0x2D` | 25,000 µV | 1,800,000–3,375,000 µV | 0–63 |
+| `LDO35` → `vmmc` (channel 35) | **16** | `0x4F` | 25,000 µV | 1,800,000–3,000,000 µV | 0–48 |
 
-The chip supports 64 selector values per LDO, but the **A7 board** constrains LDO35 to a lower maximum; we must not interpret the full 6-bit range as permission to exceed 3.0 V. Neither rail is proven to operate on real hardware without ACPM transport and physical electrical validation.
+The legacy `enum S2MPU08_regulators` skips disabled LDO15–LDO32 definitions, so channel 35 has enum ID **16**, not 35 (channel 2 has enum ID **1**, not 2). The chip supports 64 selector values per LDO, but the **A7 board** constrains LDO35 to a lower maximum; we must not interpret the full 6-bit range as permission to exceed 3.0 V. Neither rail is proven to operate on real hardware without ACPM transport and physical electrical validation.
 
 ## Staged source and proof
 
 - [`s2mpu08-a7-voltage-lab.h`](../port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.h): **host- and kernel-compilable** pure selector-to-voltage and voltage-to-selector conversion with strict board bounds. Includes a rev0 LDO35/36 integration guard, **not** the special sequence itself.
-- [`s2mpu08-a7-voltage-lab.c`](../port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.c): real modern `struct regulator_desc` data plus **read-only calculation** operations for two rails. No platform driver, module init, Kconfig selection, regulator registration, enable/disable or register I/O.
+- [`s2mpu08-a7-voltage-lab.c`](../port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.c): real modern `struct regulator_desc` data with the **correct sparse legacy enum IDs** and board-bounded LDO35 descriptor, plus **read-only calculation** operations for two rails. No platform driver, module init, Kconfig selection, regulator registration, enable/disable or register I/O.
 - [Actual host C unit test](../tests/native/test_s2mpu08_a7_voltage_lab.c) runs every valid selector and rejects out-of-bound and non-step voltages.
 - [Kernel ARM64 CI compile](../.github/workflows/a7-s2mpu08-voltage-lab.yml) stages this source into pinned Linux 6.15-rc1 **only for an explicit object build** and checks that the result is genuine AArch64. Tests can fail and must be fixed before counting this gate as PASS.
 

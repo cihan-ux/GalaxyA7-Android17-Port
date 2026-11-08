@@ -32,6 +32,16 @@ class S2MPU08VoltageLabGuardTests(unittest.TestCase):
     def test_reject_wrong_regulator_selectors(self):
         self.assertTrue(check_source(self.c, self.h.replace("0x4fU", "0x50U")))
 
+    def test_reject_wrong_sparse_legacy_enum_id(self):
+        self.assertTrue(check_source(self.c, self.h.replace(
+            "S2MPU08_A7_LDO35_LEGACY_ENUM_ID  16U",
+            "S2MPU08_A7_LDO35_LEGACY_ENUM_ID  35U")))
+
+    def test_reject_unbounded_legacy_ldo35_descriptor(self):
+        self.assertTrue(check_source(self.c.replace(
+            ".n_voltages = (S2MPU08_A7_LDO35_BOARD_MAX_UV -",
+            ".n_voltages = (S2MPU08_A7_LDO2_BOARD_MAX_UV -"), self.h))
+
     def test_reject_legacy_revision_workaround_silently_dropped(self):
         self.assertTrue(check_source(self.c, self.h.replace(
             "s2mpu08_a7_needs_rev0_ldo_guard", "removed_rev0_guard")))

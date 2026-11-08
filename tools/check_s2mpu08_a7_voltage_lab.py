@@ -9,6 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.c"
 HEADER = ROOT / "port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.h"
 REQUIRED_CONSTANTS = {
+    "S2MPU08_A7_LDO2_CHANNEL": "2U",
+    "S2MPU08_A7_LDO35_CHANNEL": "35U",
+    "S2MPU08_A7_LDO36_CHANNEL": "36U",
+    "S2MPU08_A7_LDO2_LEGACY_ENUM_ID": "1U",
+    "S2MPU08_A7_LDO35_LEGACY_ENUM_ID": "16U",
     "S2MPU08_A7_LDO2_VSEL_REG": "0x2dU",
     "S2MPU08_A7_LDO35_VSEL_REG": "0x4fU",
     "S2MPU08_A7_VSEL_MASK": "0x3fU",
@@ -45,6 +50,17 @@ def check_source(c: str, h: str) -> list[str]:
         failures.append("kernel descriptors must be voltage calculation only")
     if len(re.findall(r'\.vsel_reg\s*=\s*S2MPU08_A7_LDO(?:2|35)_VSEL_REG\s*,', code)) != 2:
         failures.append("must list exactly LDO2 and LDO35 voltage selectors")
+    for rail, legacy in (("2", "1"), ("35", "16")):
+        if not re.search(
+            rf'\.id\s*=\s*S2MPU08_A7_LDO{rail}_LEGACY_ENUM_ID\s*,', code
+        ):
+            failures.append(f"incorrect legacy enum ID for LDO{rail}; expected {legacy}")
+    if not re.search(
+        r"\.n_voltages\s*=\s*\(S2MPU08_A7_LDO35_BOARD_MAX_UV\s*-"
+        r"\s*S2MPU08_A7_MIN_UV\)\s*/\s*S2MPU08_A7_STEP_UV\s*\+\s*1U\s*,",
+        code,
+    ):
+        failures.append("LDO35 descriptor may expose more than 3.0V board maximum")
     if not re.search(r"\bs2mpu08_a7_needs_rev0_ldo_guard\s*\(", header):
         failures.append("rev0 LDO35/LDO36 guard not defined")
     if not re.search(r"\bs2mpu08_a7_voltage_to_sel\s*\(", header):

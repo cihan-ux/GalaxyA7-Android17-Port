@@ -7,24 +7,27 @@
 int main(void)
 {
 	unsigned int index;
+	/* Legacy enum is sparse; never substitute channel 35 for enum id 16. */
+	assert(S2MPU08_A7_LDO2_LEGACY_ENUM_ID == 1U);
+	assert(S2MPU08_A7_LDO35_LEGACY_ENUM_ID == 16U);
 	for (index = 0; index <= 48; index++) {
-		int uv = s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO35_ID, index);
+		int uv = s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO35_CHANNEL, index);
 		assert(uv >= 1800000 && uv <= 3000000);
-		assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO35_ID,
+		assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO35_CHANNEL,
 						  (unsigned int)uv) == (int)index);
 	}
 	for (index = 0; index <= 63; index++) {
-		int uv = s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO2_ID, index);
+		int uv = s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO2_CHANNEL, index);
 		assert(uv >= 1800000 && uv <= 3375000);
-		assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_ID,
+		assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_CHANNEL,
 						  (unsigned int)uv) == (int)index);
 	}
-	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_ID, 1799999U) == -1);
-	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_ID, 1800001U) == -1);
-	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_ID, 3375001U) == -1);
-	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO35_ID, 3025000U) == -1);
-	assert(s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO35_ID, 49U) == -1);
-	assert(s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO2_ID, 64U) == -1);
+	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_CHANNEL, 1799999U) == -1);
+	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_CHANNEL, 1800001U) == -1);
+	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO2_CHANNEL, 3375001U) == -1);
+	assert(s2mpu08_a7_voltage_to_sel(S2MPU08_A7_LDO35_CHANNEL, 3025000U) == -1);
+	assert(s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO35_CHANNEL, 49U) == -1);
+	assert(s2mpu08_a7_sel_to_voltage(S2MPU08_A7_LDO2_CHANNEL, 64U) == -1);
 	assert(s2mpu08_a7_voltage_to_sel(36U, 1800000U) == -1);
 	assert(s2mpu08_a7_sel_to_voltage(0U, 0U) == -1);
 	assert(s2mpu08_a7_needs_rev0_ldo_guard(0U, 35U));
