@@ -47,7 +47,7 @@ def check_source(source: str) -> list[str]:
         names = set(re.findall(r'\b([\w,-]+)\s*(?:=|;)', mmc))
         if names - allowed:
             errors.append("unexpected MMC settings: " + ", ".join(sorted(names-allowed)))
-    if not re.search(r'\bmmc0\s*=\s*<&mmc_0>\s*;', content):
+    if not re.search(r'\bmmc0\s*=\s*&mmc_0\s*;', content):
         errors.append("MMC0 alias missing")
     if re.search(r'\b(?:reg|ranges|vmmc-supply|vqmmc-supply|gpios|bootargs)\s*=', content):
         errors.append("unverified physical mapping/supplies")
