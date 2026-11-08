@@ -27,6 +27,7 @@ def audit(s: dict[str, str]) -> list[str]:
     old_acpm_mfd = comments_off(s["old_acpm_mfd"])
     modern_acpm = comments_off(s["modern_acpm"])
     modern_pmic = comments_off(s["modern_pmic"])
+    modern_mailbox = comments_off(s["modern_mailbox"])
     modern_soc = comments_off(s["modern_soc"])
     lab_c = comments_off(s["lab_c"])
     lab_h = comments_off(s["lab_h"])
@@ -46,6 +47,7 @@ def audit(s: dict[str, str]) -> list[str]:
         ("modern ACPM GS101 initdata", "ACPM_GS101_INITDATA_BASE", modern_acpm),
         ("modern GS101 base value", "0xa000", modern_acpm),
         ("modern GS101 compatible", '"google,gs101-acpm-ipc"', modern_acpm),
+        ("modern GS101-only mailbox", '"google,gs101-mbox"', modern_mailbox),
         ("modern PMIC type encoding", "GENMASK(11, 8)", modern_pmic),
         ("modern PMIC register encoding", "GENMASK(7, 0)", modern_pmic),
         ("modern PMIC channel field", "GENMASK(15, 12)", modern_pmic),
@@ -60,6 +62,9 @@ def audit(s: dict[str, str]) -> list[str]:
     matches = re.findall(r'\.compatible\s*=\s*"([^"]+)"', modern_acpm)
     if matches != ["google,gs101-acpm-ipc"]:
         issues.append(f"Modern ACPM platform compatible list changed: {matches}")
+    mbox_matches = re.findall(r'\.compatible\s*=\s*"([^"]+)"', modern_mailbox)
+    if mbox_matches != ["google,gs101-mbox"]:
+        issues.append(f"Modern Exynos ACPM mailbox compatible list changed: {mbox_matches}")
     if re.search(r'\bacpm\s*\{|\bexynos-acpm-ipc\b|\bgs101-acpm-ipc\b', modern_soc):
         issues.append("Modern Exynos7885 SoC now has ACPM nodes; re-review compatibility")
     disallowed = re.compile(
@@ -77,7 +82,7 @@ def audit(s: dict[str, str]) -> list[str]:
 def main() -> int:
     cli = argparse.ArgumentParser(description=__doc__)
     names = ["old_soc", "old_board", "old_mfd_h", "old_acpm_mfd",
-             "modern_acpm", "modern_pmic", "modern_soc"]
+             "modern_acpm", "modern_pmic", "modern_mailbox", "modern_soc"]
     for name in names:
         cli.add_argument("--" + name.replace("_", "-"), type=Path, required=True)
     args = cli.parse_args()
@@ -95,7 +100,8 @@ def main() -> int:
         return 1
     print("PASS: source comparison detects confirmed SM-A750F ACPM transport blocker.")
     print("Legacy Exynos7885: mailbox 0x11c40000, SRAM 0x02052000, initdata 0x4b80.")
-    print("Modern driver: only google,gs101-acpm-ipc with initdata offset 0xa000.")
+    print("Modern ACPM and mailbox: only google,gs101-acpm-ipc / google,gs101-mbox.")
+    print("GS101 ACPM uses initdata offset 0xa000; A7 legacy uses 0x4b80.")
     print("Common low-byte PMIC message layout != proof of same Exynos7885 firmware protocol.")
     print("NO kernel ACPM DT binding, firmware mailbox transport, S2MPU08 regulator driver or ROM.")
     return 0

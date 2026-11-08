@@ -25,6 +25,7 @@ def fixture():
             #define ACPM_PMIC_REG GENMASK(7, 0)
             #define ACPM_PMIC_CHANNEL GENMASK(15, 12)
             ACPM_PMIC_READ""",
+        "modern_mailbox": '.compatible = "google,gs101-mbox";',
         "modern_soc": "compatible = \"samsung,exynos7885\";",
         "lab_c": "int s2mpu08_a7_acpm_pack_read(void) { return 0; }",
         "lab_h": "#define A7_ACPM_TRANSPORT_CHANNEL      2U\n#define A7_ACPM_PMIC_WIRE_CHANNEL      0U",
@@ -38,6 +39,11 @@ class AcpmCompatibilityGateTests(unittest.TestCase):
     def test_reject_fake_exynos7885_compatibility(self):
         src = fixture()
         src["modern_acpm"] += '\n.compatible = "samsung,exynos7885-acpm-ipc";'
+        self.assertTrue(audit(src))
+
+    def test_reject_nonmatching_mailbox_supported_models(self):
+        src = fixture()
+        src["modern_mailbox"] += '\n.compatible = "samsung,exynos7885-mailbox";'
         self.assertTrue(audit(src))
 
     def test_reject_changed_acpm_sram_offset(self):

@@ -55,6 +55,7 @@ jobs:
           done <<'FILES'
           drivers/firmware/samsung/exynos-acpm.c exynos-acpm.c
           drivers/firmware/samsung/exynos-acpm-pmic.c exynos-acpm-pmic.c
+          drivers/mailbox/exynos-mailbox.c exynos-mailbox.c
           arch/arm64/boot/dts/exynos/exynos7885.dtsi exynos7885.dtsi
           FILES
           if find acpm-evidence -type f -size 0 -print -quit | grep -q .; then
@@ -75,6 +76,7 @@ jobs:
             --old-acpm-mfd acpm-evidence/old/acpm_mfd.c \
             --modern-acpm acpm-evidence/modern/exynos-acpm.c \
             --modern-pmic acpm-evidence/modern/exynos-acpm-pmic.c \
+            --modern-mailbox acpm-evidence/modern/exynos-mailbox.c \
             --modern-soc acpm-evidence/modern/exynos7885.dtsi \
             | tee acpm-evidence/transport-blocker.txt
 
