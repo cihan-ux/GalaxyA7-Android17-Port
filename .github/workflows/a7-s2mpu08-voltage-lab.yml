@@ -1,0 +1,118 @@
+name: Linux 6.15 S2MPU08 LDO2/LDO35 voltage-only ARM64 source compile
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-s2mpu08-voltage-lab.yml'
+      - 'port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.*'
+      - 'tests/native/test_s2mpu08_a7_voltage_lab.c'
+      - 'tests/test_s2mpu08_a7_voltage_lab.py'
+      - 'tools/check_s2mpu08_a7_voltage_lab.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  modern-ldo-voltage-metadata-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout A7 research port
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Reject hardware access and run source guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_s2mpu08_a7_voltage_lab.py
+          python3 -m unittest discover -s tests -p test_s2mpu08_a7_voltage_lab.py -v
+
+      - name: Compile and execute actual host C voltage selector logic
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p voltage-evidence
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iport/linux-6.15/drivers/regulator \
+            tests/native/test_s2mpu08_a7_voltage_lab.c \
+            -o voltage-evidence/a7-ldo-voltage-host-test
+          voltage-evidence/a7-ldo-voltage-host-test \
+            | tee voltage-evidence/voltage-host-test-result.txt
+
+      - name: Install Linux 6.15 ARM64 build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch immutable Exynos7885 Linux 6.15-rc1 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          grep -qx 'VERSION = 6' kernel/Makefile
+          grep -qx 'PATCHLEVEL = 15' kernel/Makefile
+
+      - name: Stage voltage-only C and H for EXPLICIT object build, not kernel registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.c kernel/drivers/regulator/
+          cp port/linux-6.15/drivers/regulator/s2mpu08-a7-voltage-lab.h kernel/drivers/regulator/
+          ! grep -q 's2mpu08-a7-voltage-lab' kernel/drivers/regulator/Makefile
+          git -C kernel diff --check
+          mkdir -p voltage-evidence
+          echo 'NO regulator Kconfig / Makefile integration; NO probe and NO hardware I/O' \
+            | tee voltage-evidence/not-registered.txt
+
+      - name: Compile S2MPU08 source port as a real Linux 6.15 AArch64 object
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/voltage-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee voltage-evidence/defconfig.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/voltage-out" ARCH=arm64 LLVM=1 \
+            drivers/regulator/s2mpu08-a7-voltage-lab.o \
+            2>&1 | tee voltage-evidence/build.log
+
+      - name: Confirm compiled AArch64 source port and record checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          obj=voltage-out/drivers/regulator/s2mpu08-a7-voltage-lab.o
+          test -s "$obj"
+          readelf -h "$obj" | tee voltage-evidence/elf-header.txt
+          readelf -h "$obj" | grep -q 'Machine:.*AArch64'
+          sha256sum "$obj" | tee voltage-evidence/arm64-object-sha256.txt
+
+      - name: Archive source build evidence, never hardware artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A7-S2MPU08-LDO-VOLTAGE-SOURCE-ONLY-COMPILE-EVIDENCE
+          path: |
+            voltage-evidence/*.txt
+            voltage-evidence/*.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: State limitations
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## S2MPU08 LDO2/LDO35 Linux 6.15 research-only voltage metadata'
+            echo 'Real C voltage conversion tested on host; real AArch64 kernel object build attempted.'
+            echo 'NO platform binding, MFD, ACPM/SPEEDY, physical regulator control or flashable kernel.'
+            echo 'The rev0 LDO35/LDO36 coupled workaround is NOT implemented.'
+            echo 'A successful test does not resolve the verified PMIC or Android 17 boot blocker.'
+          } >> "$GITHUB_STEP_SUMMARY"
