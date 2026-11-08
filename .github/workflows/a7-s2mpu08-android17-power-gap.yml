@@ -1,0 +1,101 @@
+name: A7 S2MPU08 PMIC gap in Linux 6.15 (EXPECTED BLOCKER)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-s2mpu08-android17-power-gap.yml'
+      - 'tools/check_a7_s2mpu08_power_gap.py'
+      - 'tests/test_a7_s2mpu08_power_gap.py'
+      - 'docs/a7y18lte-s2mpu08-power-port-blocker.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pin-and-audit-legacy-vs-modern-pmic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout pinned project code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Run source gap regression tests
+        run: python3 -m unittest discover -s tests -p test_a7_s2mpu08_power_gap.py -v
+
+      - name: Retrieve immutable legacy and Linux 6.15 hardware sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p power-evidence/legacy power-evidence/modern
+          legacy=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          modern=https://raw.githubusercontent.com/Mollomm1/linux-exynos7885/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          while IFS=' ' read -r rel dest; do
+            curl -fLsS --retry 3 "$legacy/$rel" -o "power-evidence/legacy/$dest"
+          done <<'FILES'
+          arch/arm64/boot/dts/exynos/exynos7885-a7y18lte_common.dtsi a7-common.dtsi
+          drivers/mfd/Kconfig mfd-Kconfig
+          drivers/mfd/Makefile mfd-Makefile
+          drivers/regulator/Kconfig reg-Kconfig
+          drivers/regulator/Makefile reg-Makefile
+          drivers/mfd/s2mpu08_core.c s2mpu08_core.c
+          drivers/regulator/s2mpu08.c s2mpu08-regulator.c
+          FILES
+          while IFS=' ' read -r rel dest; do
+            curl -fLsS --retry 3 "$modern/$rel" -o "power-evidence/modern/$dest"
+          done <<'FILES'
+          drivers/mfd/Kconfig mfd-Kconfig
+          drivers/mfd/Makefile mfd-Makefile
+          drivers/regulator/Kconfig reg-Kconfig
+          drivers/regulator/Makefile reg-Makefile
+          drivers/mfd/sec-core.c sec-core.c
+          FILES
+          find power-evidence -type f -size 0 -print -quit | grep -qv . || {
+            echo 'Empty upstream source; cannot conclude support' >&2
+            exit 1
+          }
+          sha256sum power-evidence/legacy/* power-evidence/modern/* \
+            > power-evidence/source-sha256.txt
+
+      - name: Prove model-specific S2MPU08 implementation gap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_a7_s2mpu08_power_gap.py \
+            --legacy-dts power-evidence/legacy/a7-common.dtsi \
+            --legacy-mfd-kconfig power-evidence/legacy/mfd-Kconfig \
+            --legacy-mfd-makefile power-evidence/legacy/mfd-Makefile \
+            --legacy-reg-kconfig power-evidence/legacy/reg-Kconfig \
+            --legacy-reg-makefile power-evidence/legacy/reg-Makefile \
+            --legacy-mfd-core power-evidence/legacy/s2mpu08_core.c \
+            --legacy-regulator power-evidence/legacy/s2mpu08-regulator.c \
+            --modern-mfd-kconfig power-evidence/modern/mfd-Kconfig \
+            --modern-mfd-makefile power-evidence/modern/mfd-Makefile \
+            --modern-reg-kconfig power-evidence/modern/reg-Kconfig \
+            --modern-reg-makefile power-evidence/modern/reg-Makefile \
+            --modern-sec-core power-evidence/modern/sec-core.c \
+            --expected-status blocked \
+            | tee power-evidence/power-gap-result.txt
+
+      - name: Archive ONLY human-readable evidence (not copied vendor drivers)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a7-android17-S2MPU08-PMIC-GAP-EVIDENCE
+          path: |
+            power-evidence/source-sha256.txt
+            power-evidence/power-gap-result.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: State the true blocker, not compatibility
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## S2MPU08 PMIC / Samsung Exynos7885 Android 17 integration'
+            echo 'Historical SM-A750F common DTS expects samsung,s2mpu08mfd and ACPM IPC plus vmmc/vqmmc rails.'
+            echo 'A checked gap means modern MFD/regulator drivers are absent in the inspected Linux 6.15 source integration.'
+            echo 'Even PASS means BLOCKED: no working voltage regulator, storage, boot or Android 17 ROM.'
+            echo 'No hardware access; do not fabricate regulator supplies or substitute unrelated Samsung PMICs.'
+          } >> "$GITHUB_STEP_SUMMARY"
