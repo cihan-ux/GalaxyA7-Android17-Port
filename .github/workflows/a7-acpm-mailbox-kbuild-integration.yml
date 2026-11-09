@@ -128,31 +128,3 @@ jobs:
             echo 'No DT compatible, no physical device, no ACPM queue/firmware integration, no S2MPU08 active power control.'
             echo 'built-in.a is not linked vmlinux or bootable Android 17, and is NOT a flashable image.'
           } >> "$GITHUB_STEP_SUMMARY"
- \
-            kbuild-evidence/archive-objects.txt
-          sha256sum "$obj" "$archive" | tee kbuild-evidence/object-and-archive-sha256.txt
-          echo 'PASS: real Kbuild archive includes A7 experimental AArch64 platform-driver object.' \
-            | tee kbuild-evidence/build-result.txt
-
-      - name: Archive source and test evidence, no kernel/ROM artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: A7-Linux615-mailbox-KBUILD-INTEGRATION-NOT-BOOTABLE
-          path: |
-            kbuild-evidence/*.txt
-            kbuild-evidence/*.log
-            kbuild-evidence/*.patch
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Delimit runtime status
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo '## A7 Exynos7885 ACPM mailbox: compile-time Kbuild integration'
-            echo 'Default OFF, explicitly enabled only in ephemeral pinned Linux 6.15 CI checkout.'
-            echo 'No DT compatible, no physical device, no ACPM queue/firmware integration, no S2MPU08 active power control.'
-            echo 'built-in.a is not linked vmlinux or bootable Android 17, and is NOT a flashable image.'
-          } >> "$GITHUB_STEP_SUMMARY"
