@@ -111,3 +111,8 @@ successful/failed prior operation. The C tests explicitly try a corrupt
 state enum, non-fresh zero-timeout state, fake expired state, malformed
 in-flight status, backwards restart and future half-range jump. These are
 algorithm safeguards only, not on-device clock or firmware evidence.
+
+
+### Latest lifecycle-integrity AArch64 verification
+
+[CI 42705811004](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42705811004) **passed** the entire new lifecycle-integrity check: native C regression cases, historical Samsung source comparisons, offline guards, and three pinned Linux 6.15 AArch64 compiler objects. The tests now also reject corrupted session states and cross-session backwards or ambiguous synthetic-clock restarts. **This is not firmware execution or an Android 17 ROM.**
