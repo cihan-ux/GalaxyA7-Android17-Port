@@ -23,8 +23,8 @@
 
 #define EXYNOS7885_ACPM_INTGR1 0x001c
 #define EXYNOS7885_ACPM_INTMR0 0x0010
+#define EXYNOS7885_ACPM_INTMR1 0x0024
 #define EXYNOS7885_ACPM_MAX_CHANNELS 16U
-#define EXYNOS7885_ACPM_ALL_IRQS_MASK 0xffffU
 
 struct exynos7885_acpm_mbox {
 	void __iomem *regs;
@@ -116,10 +116,11 @@ static int exynos7885_acpm_mbox_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mb);
 
-	/* Modern ACPM uses polling only; no unverified IRQ handling here. */
-	writel(EXYNOS7885_ACPM_ALL_IRQS_MASK,
-	       mb->regs + EXYNOS7885_ACPM_INTMR0);
-
+	/*
+	 * Historical Exynos7885 code writes polling channel masks to INTMR1,
+	 * not to GS101's INTMR0. Do not modify either mask before A7 firmware
+	 * interrupt semantics and the DT ownership model are validated.
+	 */
 	return devm_mbox_controller_register(dev, ctl);
 }
 

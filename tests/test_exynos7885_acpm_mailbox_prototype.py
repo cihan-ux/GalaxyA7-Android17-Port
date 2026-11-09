@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from check_exynos7885_acpm_mailbox_prototype import audit, SOURCE
 
-OLD = "#define INTGR1 0x001C\n#define INTMR0 0x0010\n"
+OLD = "#define INTGR1 0x001C\n#define INTMR0 0x0010\n#define INTMR1 0x0024\n"
 NEW = "#define EXYNOS_MBOX_INTGR1 0x40\n#define EXYNOS_MBOX_INTMR0 0x28\n"
 
 
@@ -39,6 +39,10 @@ class MailboxPrototypeTests(unittest.TestCase):
     def test_reject_automatic_integration(self):
         self.assertTrue(audit(self.c, OLD, NEW, "",
                               "obj-$(CONFIG_EXYNOS_MBOX) += exynos7885-acpm-mbox-prototype.o"))
+
+    def test_reject_unsafe_interrupt_mask_write(self):
+        extra = "\nwritel(0xffff, mb->regs + EXYNOS7885_ACPM_INTMR0);"
+        self.assertTrue(audit(self.c + extra, OLD, NEW, "", ""))
 
     def test_reject_missing_range_check(self):
         self.assertTrue(audit(

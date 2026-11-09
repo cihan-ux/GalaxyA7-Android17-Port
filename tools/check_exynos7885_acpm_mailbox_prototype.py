@@ -12,8 +12,8 @@ SOURCE = ROOT / "port/linux-6.15/drivers/mailbox/exynos7885-acpm-mbox-prototype.
 REQUIRED = {
     "EXYNOS7885_ACPM_INTGR1": 0x1c,
     "EXYNOS7885_ACPM_INTMR0": 0x10,
+    "EXYNOS7885_ACPM_INTMR1": 0x24,
     "EXYNOS7885_ACPM_MAX_CHANNELS": 16,
-    "EXYNOS7885_ACPM_ALL_IRQS_MASK": 0xffff,
 }
 
 
@@ -34,6 +34,7 @@ def audit(proto, old, modern, kconfig, makefile):
     for old_name, new_name in (
         ("INTGR1", "EXYNOS7885_ACPM_INTGR1"),
         ("INTMR0", "EXYNOS7885_ACPM_INTMR0"),
+        ("INTMR1", "EXYNOS7885_ACPM_INTMR1"),
     ):
         if define_value(old, old_name) != REQUIRED[new_name]:
             problems.append(f"Historical mailbox {old_name} changed")
@@ -56,8 +57,11 @@ def audit(proto, old, modern, kconfig, makefile):
         problems.append("Send operation missing original INTGR1 offset")
     if "exynos7885-acpm-mbox-prototype" in kconfig + makefile:
         problems.append("Prototype accidentally integrated into Linux kernel build")
-    if "writel(" not in proto:
-        problems.append("No real mailbox send operation in prototype")
+    if proto.count("writel(") != 1:
+        problems.append("Prototype must only write doorbell; firmware IRQ masks unverified")
+    if "mb->regs + EXYNOS7885_ACPM_INTMR0" in proto or \
+       "mb->regs + EXYNOS7885_ACPM_INTMR1" in proto:
+        problems.append("IRQ mask register access is not ready for this prototype")
     return problems
 
 
