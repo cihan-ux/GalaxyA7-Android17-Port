@@ -44,6 +44,14 @@ def stage_kbuild_text(kconfig: str, makefile: str, source: str) -> tuple[str, st
         raise ValueError("Source must not claim the legacy A7 monolithic ACPM node")
     if source.count("writel(") != 1:
         raise ValueError("Source must not write unverified mailbox mask registers")
+    doorbell = (
+        r"writel\s*\(\s*BIT\s*\(\s*msg->chan_id\s*\)\s*<<\s*16\s*,"
+        r"\s*mb->regs\s*\+\s*EXYNOS7885_ACPM_INTGR0\s*\)\s*;"
+    )
+    if not re.search(doorbell, source) or not re.search(
+        r"#define\s+EXYNOS7885_ACPM_INTGR0\s+0x0008\b", source
+    ):
+        raise ValueError("AP->APM doorbell requires INTGR0=0x08 and BIT(channel)<<16")
     if re.search(r"\b(?:CONFIG_EXYNOS7885_ACPM_MBOX_LAB|CONFIG_EXYNOS_MBOX)\b", source):
         raise ValueError("Hardcoded Kconfig coupling detected inside driver")
     new_kconfig = parts[0] + "\n" + KCONFIG_STANZA.rstrip() + parts[1] + parts[2]
