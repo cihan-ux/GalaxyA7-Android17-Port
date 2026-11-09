@@ -61,3 +61,8 @@ without overwriting caller output. Tests exercise both bitmap halves,
 counter wrap, a single unquarantined high-number slot, and total exhaustion.
 It does **not** send a request or guarantee firmware transaction uniqueness
 without real channel synchronization.
+
+
+### CI evidence and limit
+
+The original lifecycle with timeout quarantine and high-bit sequence-63 coverage **passed [CI 42618707342](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42618707342)**, including all C/native and three Linux 6.15 ARM64 object builds. The new allocator is independently exercised in [CI 42619169717](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42619169717); check the final run status before declaring its AArch64 compilation passed. No real ACPM read or write occurs.
