@@ -43,6 +43,10 @@ def audit(source, header):
         "elapsed = observed_ms - lifecycle->start_ms",
         "elapsed >= lifecycle->timeout_ms",
         "lifecycle->state = A7_ACPM_WAIT_EXPIRED",
+        "quarantined_sequence_low",
+        "quarantined_sequence_high",
+        "lifecycle->quarantined_sequence_low |=",
+        "lifecycle->quarantined_sequence_high |=",
         "A7_ACPM_WAIT_FIRMWARE_ERR",
     ):
         if needle not in code:

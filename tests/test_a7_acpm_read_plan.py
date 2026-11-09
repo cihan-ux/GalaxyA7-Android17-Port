@@ -44,6 +44,13 @@ class ReadPlanSafetyTests(unittest.TestCase):
                                 "elapsed < lifecycle->timeout_ms"),
             self.header))
 
+    def test_reject_dropping_timeout_sequence_quarantine(self):
+        self.assertTrue(audit(
+            self.source.replace(
+                "lifecycle->quarantined_sequence_low |=",
+                "lifecycle->quarantined_sequence_low ="),
+            self.header))
+
     def test_reject_real_sleep_or_clock_api(self):
         self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
 

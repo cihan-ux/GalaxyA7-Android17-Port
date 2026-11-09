@@ -36,3 +36,16 @@ This is **not** a runtime timeout implementation: there is no timer,
 interrupt controller, lock, queue ownership or scheduler. The maximum
 timeout is a deliberately chosen test constraint, **not a firmware
 specification**. All input timestamps and response frames are artificial.
+
+
+### Six-bit timed-out sequence quarantine
+
+The legacy ACPM protocol only has **63 nonzero sequence IDs**. A reply
+from a timed-out request can therefore alias a later read after sequence
+wraparound. The offline lifecycle now remembers timed-out IDs in two
+32-bit bitmaps, refuses restarting with those IDs, and preserves the
+quarantine through subsequent sessions. It deliberately provides **no
+automatic release**, because clearing a quarantined ID requires a
+separately verified firmware queue drain/reset and synchronization. The
+model may eventually exhaust its 63 IDs; this is preferable to falsely
+accepting a late reply. No actual firmware reset/drain is implemented.

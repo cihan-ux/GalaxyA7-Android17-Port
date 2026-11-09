@@ -103,8 +103,17 @@ static void test_mock_read_lifecycle(void)
 		A7_ACPM_WAIT_ALREADY_DONE);
 	assert(memcmp(&before, &state, sizeof(state)) == 0);
 
-	/* After deliberate restart a timely response can succeed. */
+	/* Never reuse sequence 7 while its late reply is unaccounted for. */
+	before = state;
+	assert(state.quarantined_sequence_low & (1U << 7));
+	assert(a7_acpm_begin_read_lifecycle(&request, 100, 20, &state) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+	/* A new non-quarantined sequence can start. */
+	request.sequence = 8;
+	request.request.word[0] = (8U << 16) | 0x14fU;
+	replies[0].word[0] = request.request.word[0];
 	assert(a7_acpm_begin_read_lifecycle(&request, 100, 20, &state) == 0);
+	assert(state.quarantined_sequence_low & (1U << 7));
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 105) == 0);
 	assert(state.state == A7_ACPM_WAIT_SUCCESS);
@@ -121,11 +130,11 @@ static void test_mock_read_lifecycle(void)
 
 	/* Stale sequence or wrong register must remain pending. */
 	assert(a7_acpm_begin_read_lifecycle(&request, 300, 20, &state) == 0);
-	replies[0].word[0] = (6U << 16) | 0x14fU;
+	replies[0].word[0] = (7U << 16) | 0x14fU;
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 301) == 0);
 	assert(state.state == A7_ACPM_WAIT_PENDING);
-	replies[0].word[0] = (7U << 16) | 0x100U;
+	replies[0].word[0] = (8U << 16) | 0x100U;
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 302) == 0);
 	assert(state.state == A7_ACPM_WAIT_PENDING);
@@ -143,6 +152,9 @@ static void test_mock_read_lifecycle(void)
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 321) == 0);
 	assert(state.state == A7_ACPM_WAIT_EXPIRED);
+	assert(state.quarantined_sequence_low & (1U << 8));
+	assert(state.quarantined_sequence_low & (1U << 7));
+	assert(a7_acpm_begin_read_lifecycle(&request, 500, 20, &state) == -1);
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 0, &state) == -1);
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 60001, &state) == -1);
 	puts("PASS: mock ACPM read lifecycle timeout, wrap, late reply, error, retry and stale data");

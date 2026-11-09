@@ -146,7 +146,12 @@ int a7_acpm_begin_read_lifecycle(
 	    ((request->request.word[0] & seq_mask) >>
 	     A7_ACPM_READ_SEQUENCE_SHIFT) != request->sequence ||
 	    (lifecycle->state == A7_ACPM_WAIT_PENDING &&
-	     lifecycle->timeout_ms))
+	     lifecycle->timeout_ms) ||
+	    (request->sequence < 32U ?
+	     (lifecycle->quarantined_sequence_low &
+	      (1U << request->sequence)) :
+	     (lifecycle->quarantined_sequence_high &
+	      (1U << (request->sequence - 32U)))))
 		return A7_ACPM_READ_PLAN_ERROR;
 
 	next.state = A7_ACPM_WAIT_PENDING;
@@ -156,6 +161,8 @@ int a7_acpm_begin_read_lifecycle(
 	next.timeout_ms = timeout_ms;
 	next.firmware_status = 0;
 	next.response_value = 0;
+	next.quarantined_sequence_low = lifecycle->quarantined_sequence_low;
+	next.quarantined_sequence_high = lifecycle->quarantined_sequence_high;
 	*lifecycle = next;
 	return 0;
 }
@@ -187,6 +194,16 @@ int a7_acpm_advance_read_lifecycle(
 		lifecycle->state = A7_ACPM_WAIT_EXPIRED;
 		lifecycle->firmware_status = 0;
 		lifecycle->response_value = 0;
+		/*
+		 * A timed-out firmware reply may still arrive. Block this
+		 * six-bit sequence instead of aliasing a later PMIC read.
+		 */
+		if (lifecycle->sequence < 32U)
+			lifecycle->quarantined_sequence_low |=
+				1U << lifecycle->sequence;
+		else
+			lifecycle->quarantined_sequence_high |=
+				1U << (lifecycle->sequence - 32U);
 		return 0;
 	}
 

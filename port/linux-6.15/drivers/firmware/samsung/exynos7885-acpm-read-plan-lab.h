@@ -85,11 +85,15 @@ struct a7_acpm_read_lifecycle {
 	unsigned int timeout_ms;
 	unsigned int firmware_status;
 	unsigned int response_value;
+	/* Block expired sequences until externally verified firmware drain. */
+	unsigned int quarantined_sequence_low;
+	unsigned int quarantined_sequence_high;
 };
 
 /*
  * Zero-initialize before the first begin. A pending request cannot be
- * replaced. A terminal request may be explicitly restarted by the caller.
+ * replaced. A terminal request can restart only with a non-quarantined
+ * sequence. No unverified automatic quarantine-clearing API is provided.
  */
 int a7_acpm_begin_read_lifecycle(
 	const struct a7_acpm_read_plan *request,
