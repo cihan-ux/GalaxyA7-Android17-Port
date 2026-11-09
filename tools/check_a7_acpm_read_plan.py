@@ -47,6 +47,9 @@ def audit(source, header):
         "quarantined_sequence_high",
         "lifecycle->quarantined_sequence_low |=",
         "lifecycle->quarantined_sequence_high |=",
+        "a7_acpm_next_unquarantined_sequence(",
+        "checked < A7_ACPM_READ_SEQUENCE_MAX",
+        "candidate = A7_ACPM_READ_SEQUENCE_MIN",
         "A7_ACPM_WAIT_FIRMWARE_ERR",
     ):
         if needle not in code:

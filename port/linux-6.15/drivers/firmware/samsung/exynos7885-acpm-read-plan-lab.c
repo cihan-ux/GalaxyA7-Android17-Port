@@ -221,3 +221,40 @@ int a7_acpm_advance_read_lifecycle(
 		A7_ACPM_WAIT_FIRMWARE_ERR : A7_ACPM_WAIT_SUCCESS;
 	return 0;
 }
+
+/*
+ * 6-bit sequence allocator for the offline model. Since the real firmware
+ * increments a 1..63 counter, this models wraparound but refuses any number
+ * that can still alias a timed-out response. Eventually all 63 IDs might
+ * be unavailable; in that case fail closed without modifying *out.
+ */
+int a7_acpm_next_unquarantined_sequence(
+	const struct a7_acpm_read_lifecycle *lifecycle,
+	unsigned int previous_sequence, unsigned int *next_sequence)
+{
+	unsigned int candidate, checked, mask;
+
+	if (!lifecycle || !next_sequence ||
+	    previous_sequence > A7_ACPM_READ_SEQUENCE_MAX ||
+	    (lifecycle->state == A7_ACPM_WAIT_PENDING &&
+	     lifecycle->timeout_ms))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	candidate = previous_sequence;
+	for (checked = 0; checked < A7_ACPM_READ_SEQUENCE_MAX; checked++) {
+		candidate++;
+		if (candidate > A7_ACPM_READ_SEQUENCE_MAX)
+			candidate = A7_ACPM_READ_SEQUENCE_MIN;
+		mask = candidate < 32U ?
+			(lifecycle->quarantined_sequence_low &
+			 (1U << candidate)) :
+			(lifecycle->quarantined_sequence_high &
+			 (1U << (candidate - 32U)));
+		if (!mask) {
+			*next_sequence = candidate;
+			return 0;
+		}
+	}
+
+	return A7_ACPM_READ_PLAN_ERROR;
+}

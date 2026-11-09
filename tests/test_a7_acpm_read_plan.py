@@ -51,6 +51,12 @@ class ReadPlanSafetyTests(unittest.TestCase):
                 "lifecycle->quarantined_sequence_low ="),
             self.header))
 
+    def test_reject_unsafe_sequence_allocator_wrap_removed(self):
+        self.assertTrue(audit(
+            self.source.replace("candidate = A7_ACPM_READ_SEQUENCE_MIN",
+                                "candidate = 0U"),
+            self.header))
+
     def test_reject_real_sleep_or_clock_api(self):
         self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
 

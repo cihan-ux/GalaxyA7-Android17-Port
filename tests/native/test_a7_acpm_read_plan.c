@@ -176,8 +176,51 @@ static void test_mock_read_lifecycle(void)
 	puts("PASS: low/high six-bit sequence quarantine, timeout, wrap, late reply and firmware error");
 }
 
+static void test_mock_safe_sequence_allocation(void)
+{
+	struct a7_acpm_read_lifecycle state = {0};
+	unsigned int chosen = 0xabcdefU;
+
+	/* Legacy counter wraps 63 -> 1 and starts at 1 after 0. */
+	assert(a7_acpm_next_unquarantined_sequence(&state, 0, &chosen) == 0);
+	assert(chosen == 1);
+	assert(a7_acpm_next_unquarantined_sequence(&state, 63, &chosen) == 0);
+	assert(chosen == 1);
+
+	/* Distinct quarantine masks for low 1..31 and high 32..63. */
+	state.quarantined_sequence_low = (1U << 7) | (1U << 8);
+	assert(a7_acpm_next_unquarantined_sequence(&state, 6, &chosen) == 0);
+	assert(chosen == 9);
+	state.quarantined_sequence_high = 1U << 31;
+	assert(a7_acpm_next_unquarantined_sequence(&state, 62, &chosen) == 0);
+	assert(chosen == 1);
+
+	/* No available sequence must not invent a successful transaction. */
+	state.quarantined_sequence_low = 0xfffffffeU;
+	state.quarantined_sequence_high = 0xffffffffU;
+	chosen = 0xabcdefU;
+	assert(a7_acpm_next_unquarantined_sequence(&state, 11, &chosen) == -1);
+	assert(chosen == 0xabcdefU);
+	/* One remaining high-number slot must be discovered after wrap. */
+	state.quarantined_sequence_high &= ~(1U << 31);
+	assert(a7_acpm_next_unquarantined_sequence(&state, 1, &chosen) == 0);
+	assert(chosen == 63);
+
+	/* No allocation while another request remains pending. */
+	state.state = A7_ACPM_WAIT_PENDING;
+	state.timeout_ms = 10;
+	chosen = 0xabcdefU;
+	assert(a7_acpm_next_unquarantined_sequence(&state, 0, &chosen) == -1);
+	assert(chosen == 0xabcdefU);
+	assert(a7_acpm_next_unquarantined_sequence(&state, 64, &chosen) == -1);
+	assert(a7_acpm_next_unquarantined_sequence(NULL, 0, &chosen) == -1);
+	assert(a7_acpm_next_unquarantined_sequence(&state, 0, NULL) == -1);
+	puts("PASS: offline 1..63 ACPM sequence allocator skips quarantine and fails closed on exhaustion");
+}
+
 int main(void)
 {
+	test_mock_safe_sequence_allocation();
 	test_mock_read_lifecycle();
 	check_mock_reply_matching();
 	struct a7_legacy_framework_prefix fw = {0};

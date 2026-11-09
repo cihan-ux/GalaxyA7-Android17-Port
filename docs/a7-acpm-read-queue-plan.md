@@ -49,3 +49,15 @@ automatic release**, because clearing a quarantined ID requires a
 separately verified firmware queue drain/reset and synchronization. The
 model may eventually exhaust its 63 IDs; this is preferable to falsely
 accepting a late reply. No actual firmware reset/drain is implemented.
+
+
+### Bounded sequence allocator
+
+A companion pure-C function `a7_acpm_next_unquarantined_sequence()`
+scans the legacy **1–63** sequence space with wraparound, skipping every
+timed-out ID tracked in the two quarantine bitmaps. It refuses allocation
+while a request is pending and returns an error if all 63 IDs are blocked,
+without overwriting caller output. Tests exercise both bitmap halves,
+counter wrap, a single unquarantined high-number slot, and total exhaustion.
+It does **not** send a request or guarantee firmware transaction uniqueness
+without real channel synchronization.

@@ -116,4 +116,13 @@ int a7_acpm_advance_read_lifecycle(
 	unsigned int ring_count, unsigned int rear, unsigned int front,
 	unsigned int observed_ms);
 
+/*
+ * Synthetic 1..63 sequence allocator, skipping timed-out IDs.
+ * Returns 0 and next sequence, -1 when invalid, pending or exhausted.
+ * It never clears quarantine and never modifies the request or firmware.
+ */
+int a7_acpm_next_unquarantined_sequence(
+	const struct a7_acpm_read_lifecycle *lifecycle,
+	unsigned int previous_sequence, unsigned int *next_sequence);
+
 #endif
