@@ -49,7 +49,7 @@ class MailboxPrototypeTests(unittest.TestCase):
 
     def test_reject_automatic_integration(self):
         self.assertTrue(audit(self.c, OLD, NEW, "",
-                              "obj-$(CONFIG_EXYNOS_MBOX) += exynos7885-acpm-mbox-prototype.o"))
+                              "obj-$(CONFIG_EXYNOS_MBOX) += exynos7885-acpm-mbox-prototype.o", OLD_IMPL))
 
     def test_reject_unsafe_interrupt_mask_write(self):
         extra = "\nwritel(0xffff, mb->regs + EXYNOS7885_ACPM_INTMR0);"
