@@ -280,20 +280,35 @@ static void test_offline_atomic_read_begin(void)
 		&life, &plan, NULL, 0, 0, 0, 230) == 0);
 	assert(life.state == A7_ACPM_WAIT_EXPIRED);
 	assert(life.quarantined_sequence_low & (1U << 9));
-	assert(a7_acpm_prepare_begin_s2mpu08_read(
-		&fw, &ch, 1, 0x4f, 9, 2, 1, 300, 30,
-		&life, &plan, &sequence) == 0);
-	assert(sequence == 10 && life.sequence == 10);
 
-	/* A full queue and invalid lifetime reject atomically. */
+	/*
+	 * While no session is pending, test real full-ring and invalid-timeout
+	 * rejection, not merely rejection because an earlier read is active.
+	 * None of the caller-visible outputs may change.
+	 */
 	prior_life = life;
 	prior_plan = plan;
 	prior_sequence = sequence;
 	assert(a7_acpm_prepare_begin_s2mpu08_read(
-		&fw, &ch, 1, 0x4f, 10, 1, 2, 305, 30,
+		&fw, &ch, 1, 0x4f, 9, 1, 2, 305, 30,
 		&life, &plan, &sequence) == -1);
 	assert(a7_acpm_prepare_begin_s2mpu08_read(
-		&fw, &ch, 1, 0x4f, 10, 2, 1, 305, 0,
+		&fw, &ch, 1, 0x4f, 9, 2, 1, 305, 0,
+		&life, &plan, &sequence) == -1);
+	assert(memcmp(&prior_life, &life, sizeof(life)) == 0);
+	assert(memcmp(&prior_plan, &plan, sizeof(plan)) == 0);
+	assert(sequence == prior_sequence);
+
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 9, 2, 1, 300, 30,
+		&life, &plan, &sequence) == 0);
+	assert(sequence == 10 && life.sequence == 10);
+	assert(life.state == A7_ACPM_WAIT_PENDING);
+	prior_life = life;
+	prior_plan = plan;
+	prior_sequence = sequence;
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 10, 2, 1, 305, 30,
 		&life, &plan, &sequence) == -1);
 	assert(memcmp(&prior_life, &life, sizeof(life)) == 0);
 	assert(memcmp(&prior_plan, &plan, sizeof(plan)) == 0);
