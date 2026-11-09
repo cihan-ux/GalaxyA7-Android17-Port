@@ -100,7 +100,7 @@ int a7_acpm_match_s2mpu08_read_reply(
 		word = ring[position].word[0];
 		if (((word & seq_mask) >> A7_ACPM_READ_SEQUENCE_SHIFT) ==
 		    request->sequence &&
-		    (word & 0x0fffU) == (request->request.word[0] & 0x0fffU)) {
+		    (word & 0xffffU) == (request->request.word[0] & 0xffffU)) {
 			status = (ring[position].word[1] >>
 				  A7_ACPM_READ_RESPONSE_STATUS_SHIFT) &
 				 A7_ACPM_READ_RESPONSE_BYTE_MASK;

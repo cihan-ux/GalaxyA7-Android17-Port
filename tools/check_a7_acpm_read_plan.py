@@ -34,7 +34,7 @@ def audit(source, header):
         "channel->type != A7_ACPM_QUEUE_TYPE",
         "next_front == rear",
         "a7_acpm_match_s2mpu08_read_reply(",
-        "(word & 0x0fffU) == (request->request.word[0] & 0x0fffU)",
+        "(word & 0xffffU) == (request->request.word[0] & 0xffffU)",
         "decision.firmware_status = status",
         "decision.next_rear = (rear + 1U) % ring_count",
         "decision.requires_rear_swap = position != rear",

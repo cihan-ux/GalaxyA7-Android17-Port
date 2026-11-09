@@ -37,6 +37,16 @@ static void check_mock_reply_matching(void)
 	assert(decision.firmware_status == 2);
 	assert(decision.response_value == 0);
 	previous = decision;
+	/*
+	 * Bits 15:12 are the PMIC wire channel, distinct from transport
+	 * channel 2. A forged reply on another PMIC wire channel must NOT
+	 * be accepted merely because type/register/sequence match.
+	 */
+	replies[1].word[0] = request.request.word[0] | (1U << 12);
+	assert(a7_acpm_match_s2mpu08_read_reply(&request, replies, 4, 3, 2,
+						&decision) == A7_ACPM_REPLY_NOT_FOUND);
+	assert(memcmp(&decision, &previous, sizeof(decision)) == 0);
+	replies[1].word[0] = request.request.word[0];
 	/* Two matching responses cannot be safely attributed to one read. */
 	replies[3].word[0] = request.request.word[0];
 	replies[3].word[1] = (0x44U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT);

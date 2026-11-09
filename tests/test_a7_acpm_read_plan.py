@@ -30,13 +30,20 @@ class ReadPlanSafetyTests(unittest.TestCase):
     def test_reject_missing_response_sequence_and_register_match(self):
         self.assertTrue(audit(
             self.source.replace(
-                "(word & 0x0fffU) == (request->request.word[0] & 0x0fffU)",
-                "(word & 0x0fffU) != (request->request.word[0] & 0x0fffU)"),
+                "(word & 0xffffU) == (request->request.word[0] & 0xffffU)",
+                "(word & 0xffffU) != (request->request.word[0] & 0xffffU)"),
             self.header))
 
     def test_reject_removing_ambiguous_duplicate_reply_guard(self):
         self.assertTrue(audit(
             self.source.replace("match_count > 1U", "match_count > 99U"),
+            self.header))
+
+    def test_reject_ignoring_pmic_wire_channel(self):
+        self.assertTrue(audit(
+            self.source.replace(
+                "(word & 0xffffU) == (request->request.word[0] & 0xffffU)",
+                "(word & 0x0fffU) == (request->request.word[0] & 0x0fffU)"),
             self.header))
 
     def test_reject_unsafe_response_queue_mutation(self):

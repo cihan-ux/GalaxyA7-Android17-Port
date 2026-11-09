@@ -128,3 +128,16 @@ It scans the full synthetic ring before publishing a result; a duplicate
 returns an error and leaves the caller's output untouched. This is a
 conservative additional safeguard, not a claim about real firmware
 deduplication or queue ownership.
+
+
+### PMIC wire-channel identity (bits 15:12)
+
+The legacy ACPM transport channel **2** is not the four-bit PMIC wire
+channel field in command word 0. The offline reply matcher previously
+compared only bits 11:0 (PMIC type/register), allowing a reply from
+another wire channel with the same sequence/type/register to match.
+It now checks **all 16 low command bits** (wire channel, type and
+register), as well as the separate six-bit request sequence.
+A negative native test for a forged nonzero wire channel and a
+source-audit regression enforce this behavior. This remains a
+synthetic frame check; it does not prove firmware or hardware behavior.
