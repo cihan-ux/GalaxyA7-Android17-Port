@@ -6,7 +6,7 @@ The source [`exynos7885-acpm-read-plan-lab.c`](../port/linux-6.15/drivers/firmwa
 
 For a successful mock request, the planner returns only **plain integers**: an in-SRAM relative queue-entry offset, the proposed next front, PMIC command with a six-bit sequence in bits 21:16, and the hardware doorbell **INTGR0=0x08**, value **`BIT(channel)<<16`**. The final two values match the original [Samsung Exynos7885 `acpm_ipc.c`](https://github.com/exynos7885-dev/kernel_samsung_exynos7885/blob/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/acpm_ipc.c). The earlier compiled prototype using `INTGR1=0x1C` was wrong-direction and must never be substituted.
 
-[CI](../.github/workflows/a7-acpm-read-queue-plan.yml) runs actual C host tests with 63 successful sequence cases and failing edge cases, compares sequence and doorbell code with pinned historical Samsung source, then compiles **all three C files** as actual Linux 6.15 AArch64 research objects. The compiler output is **not linked into bootable vmlinux**.
+[CI](../.github/workflows/a7-acpm-read-queue-plan.yml) runs actual C host tests with 63 successful sequence cases and failing edge cases, compares sequence and doorbell code with pinned historical Samsung source, then compiles **all three C files** as actual Linux 6.15 AArch64 research objects. **All steps passed in [GitHub CI 42614880503](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42614880503)**, including the historical queue-vs-buffer safety check. The compiler output is **not linked into bootable vmlinux**.
 
 ## Still missing
 
