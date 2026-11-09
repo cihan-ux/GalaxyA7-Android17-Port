@@ -1,0 +1,13 @@
+# A7/S2MPU08 complete *offline* ACPM read-request planner
+
+This research component links the previously independent [Samsung ACPM SRAM layout validator](a7-exynos7885-acpm-sram-abi.md), [pure S2MPU08 PMIC message encoder](a7-s2mpu08-acpm-frame-lab.md) and the **legacy AP→APM sequence/doorbell semantics** into one guarded mock read-request preparation. It is not a usable ACPM driver.
+
+The source [`exynos7885-acpm-read-plan-lab.c`](../port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-read-plan-lab.c) implements only a decision from caller-supplied RAM snapshots. It validates A7's 0x1B000-byte historical SRAM allocation, the framework's channel count and descriptor offset, and the source-mapped S2MPU08 **transport channel 2**. It requires an exact four-word (16-byte) read entry and validates queue-front, queue-rear, length and wraparound. It refuses a full ring, out-of-range channels, non-step type/register inputs and sequence values outside **1–63**. Failures leave the caller's result unchanged.
+
+For a successful mock request, the planner returns only **plain integers**: an in-SRAM relative queue-entry offset, the proposed next front, PMIC command with a six-bit sequence in bits 21:16, and the hardware doorbell **INTGR0=0x08**, value **`BIT(channel)<<16`**. The final two values match the original [Samsung Exynos7885 `acpm_ipc.c`](https://github.com/exynos7885-dev/kernel_samsung_exynos7885/blob/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/acpm_ipc.c). The earlier compiled prototype using `INTGR1=0x1C` was wrong-direction and must never be substituted.
+
+[CI](../.github/workflows/a7-acpm-read-queue-plan.yml) runs actual C host tests with 63 successful sequence cases and failing edge cases, compares sequence and doorbell code with pinned historical Samsung source, then compiles **all three C files** as actual Linux 6.15 AArch64 research objects. The compiler output is **not linked into bootable vmlinux**.
+
+## Still missing
+
+No code in this component maps physical A7 SRAM, touches MMIO, sends a mailbox, holds firmware locks, handles IRQs, changes PMIC voltage or registers with a platform device. Real-world ACPM queue concurrency and ownership are not solved by validating synthetic snapshots. The separate [Kbuild mailbox prototype](a7-mailbox-linux615-kbuild-integration.md) remains unbound and must not be flashed. S2MPU08 MFD/regulator integration, RAM carveouts, vendor interfaces, VINTF/SELinux and Android 17 device boot are still blocked.
