@@ -66,3 +66,16 @@ without real channel synchronization.
 ### CI evidence and limit
 
 The original lifecycle with timeout quarantine and high-bit sequence-63 coverage **passed [CI 42618707342](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42618707342)**, including all C/native and three Linux 6.15 ARM64 object builds. The new allocator is independently exercised in [CI 42619169717](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42619169717); check the final run status before declaring its AArch64 compilation passed. No real ACPM read or write occurs.
+
+
+### Synthetic clock regression guard
+
+The 32-bit timestamp model now records `last_observed_ms` alongside
+`start_ms`, and rejects caller-supplied timestamps that imply a negative
+delta (as interpreted under the half-range rule), **without altering the
+session or quarantining a sequence**. It also rejects ambiguous total elapsed
+time >= 2^31 ms. Tests include backwards observations, a wildly distant
+sample, wraparound near `0xffffffff`, timely completion and expiry. This
+is a defensive **model-input check**; a real ACPM driver still needs a
+verified monotonic clock, proper timeout/synchronization and firmware
+queue ownership.

@@ -89,6 +89,16 @@ static void test_mock_read_lifecycle(void)
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 0, 5) == 0);
 	assert(state.state == A7_ACPM_WAIT_PENDING);
+	assert(state.last_observed_ms == 5U);
+	before = state;
+	/* A backwards clock sample is invalid and must not expire this read. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 0, 4) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+	/* A wildly distant sample is also ambiguous: reject, do not expire. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 0, 0x80000005U) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
 	replies[0].word[0] = request.request.word[0];
 	replies[0].word[1] = (0x55U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT);
 
@@ -117,6 +127,7 @@ static void test_mock_read_lifecycle(void)
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 105) == 0);
 	assert(state.state == A7_ACPM_WAIT_SUCCESS);
+	assert(state.last_observed_ms == 105U);
 	assert(state.response_value == 0x55U && state.firmware_status == 0);
 
 	/* Firmware errors must not expose data as successful PMIC reads. */
@@ -152,6 +163,7 @@ static void test_mock_read_lifecycle(void)
 	assert(a7_acpm_advance_read_lifecycle(
 		&state, &request, replies, 4, 0, 1, 321) == 0);
 	assert(state.state == A7_ACPM_WAIT_EXPIRED);
+	assert(state.last_observed_ms == 321U);
 	assert(state.quarantined_sequence_low & (1U << 8));
 	assert(state.quarantined_sequence_low & (1U << 7));
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 20, &state) == -1);

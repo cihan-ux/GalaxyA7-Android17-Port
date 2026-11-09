@@ -82,6 +82,7 @@ struct a7_acpm_read_lifecycle {
 	unsigned int sequence;
 	unsigned int command_word0;
 	unsigned int start_ms;
+	unsigned int last_observed_ms;
 	unsigned int timeout_ms;
 	unsigned int firmware_status;
 	unsigned int response_value;
@@ -103,7 +104,9 @@ int a7_acpm_begin_read_lifecycle(
 /*
  * Advance from a synthetic RX snapshot at a caller-supplied u32 timestamp.
  * Elapsed time is evaluated modulo 2^32, with a <=60s timeout budget.
- * Input samples must be taken less than 2^31ms apart to avoid ambiguity.
+ * Backward or otherwise ambiguous timestamps are REJECTED without changing
+ * state. Both consecutive and total age must be <2^31ms. Caller supplies
+ * samples; this is not a real hardware monotonic time source.
  * Once timed out or completed, a delayed/stale reply cannot change state.
  *
  * Return 0 for a valid update (including still pending);

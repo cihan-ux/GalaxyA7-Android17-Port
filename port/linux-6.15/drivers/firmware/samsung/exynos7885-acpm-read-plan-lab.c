@@ -158,6 +158,7 @@ int a7_acpm_begin_read_lifecycle(
 	next.sequence = request->sequence;
 	next.command_word0 = request->request.word[0];
 	next.start_ms = start_ms;
+	next.last_observed_ms = start_ms;
 	next.timeout_ms = timeout_ms;
 	next.firmware_status = 0;
 	next.response_value = 0;
@@ -175,7 +176,7 @@ int a7_acpm_advance_read_lifecycle(
 	unsigned int observed_ms)
 {
 	struct a7_acpm_reply_decision matched;
-	unsigned int elapsed;
+	unsigned int elapsed, since_last;
 	int result;
 
 	if (!lifecycle || !request || !lifecycle->timeout_ms ||
@@ -188,9 +189,19 @@ int a7_acpm_advance_read_lifecycle(
 	if (lifecycle->state != A7_ACPM_WAIT_PENDING)
 		return A7_ACPM_WAIT_ALREADY_DONE;
 
-	/* Modulo arithmetic also handles a wrapped 32-bit fake clock. */
+	/*
+	 * A backwards sample (or an observation > 2^31ms ahead) is
+	 * indistinguishable from wraparound under a naive u32 subtract.
+	 * Do not falsely expire the request or trust a reply on that sample.
+	 * Both total age and consecutive time increments must remain bounded.
+	 */
+	since_last = observed_ms - lifecycle->last_observed_ms;
 	elapsed = observed_ms - lifecycle->start_ms;
+	if (since_last >= 0x80000000U || elapsed >= 0x80000000U)
+		return A7_ACPM_READ_PLAN_ERROR;
+
 	if (elapsed >= lifecycle->timeout_ms) {
+		lifecycle->last_observed_ms = observed_ms;
 		lifecycle->state = A7_ACPM_WAIT_EXPIRED;
 		lifecycle->firmware_status = 0;
 		lifecycle->response_value = 0;
@@ -209,11 +220,14 @@ int a7_acpm_advance_read_lifecycle(
 
 	result = a7_acpm_match_s2mpu08_read_reply(
 		request, reply_ring, ring_count, rear, front, &matched);
-	if (result == A7_ACPM_REPLY_NOT_FOUND)
+	if (result == A7_ACPM_REPLY_NOT_FOUND) {
+		lifecycle->last_observed_ms = observed_ms;
 		return 0;
+	}
 	if (result != 0)
 		return A7_ACPM_READ_PLAN_ERROR;
 
+	lifecycle->last_observed_ms = observed_ms;
 	lifecycle->firmware_status = matched.firmware_status;
 	lifecycle->response_value = matched.firmware_status ?
 		0 : matched.response_value;

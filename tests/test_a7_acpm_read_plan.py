@@ -57,6 +57,13 @@ class ReadPlanSafetyTests(unittest.TestCase):
                                 "candidate = 0U"),
             self.header))
 
+    def test_reject_clock_regression_check_removed(self):
+        self.assertTrue(audit(
+            self.source.replace(
+                "since_last >= 0x80000000U || elapsed >= 0x80000000U",
+                "since_last == 0x80000000U"),
+            self.header))
+
     def test_reject_real_sleep_or_clock_api(self):
         self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
 
