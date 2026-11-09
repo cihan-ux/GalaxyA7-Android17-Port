@@ -22,6 +22,11 @@ class ReadPlanSafetyTests(unittest.TestCase):
     def test_reject_irq_mask_mmio(self):
         self.assertTrue(audit(self.source + "\nwritel(BIT(2), regs);", self.header))
 
+    def test_reject_accepting_buffer_as_queue(self):
+        self.assertTrue(audit(
+            self.source.replace("channel->type != A7_ACPM_QUEUE_TYPE",
+                                "channel->type != A7_ACPM_BUFFER_TYPE"), self.header))
+
     def test_reject_wrong_doorbell(self):
         self.assertTrue(audit(self.source, self.header.replace(
             "A7_ACPM_DOORBELL_INTGR0_OFFSET 0x0008U",
