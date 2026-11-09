@@ -18,6 +18,13 @@ class MailboxPrototypeTests(unittest.TestCase):
     def test_legacy_vs_modern_registers(self):
         self.assertEqual(audit(self.c, OLD, NEW, "", ""), [])
 
+    def test_accept_pinned_style_inline_register_comments(self):
+        modern = (
+            "#define EXYNOS_MBOX_INTGR1 0x40 /* Generation register */\n"
+            "#define EXYNOS_MBOX_INTMR0 0x28 /* Mask register */\n"
+        )
+        self.assertEqual(audit(self.c, OLD, modern, "", ""), [])
+
     def test_reject_wrong_old_offset(self):
         self.assertTrue(audit(self.c, OLD.replace("0x001C", "0x0040"), NEW, "", ""))
 

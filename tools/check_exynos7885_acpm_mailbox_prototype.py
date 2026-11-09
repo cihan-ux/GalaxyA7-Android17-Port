@@ -18,7 +18,11 @@ REQUIRED = {
 
 
 def define_value(src, name):
-    match = re.search(r"^#define\s+" + re.escape(name) + r"\s+(0[xX][a-fA-F0-9]+|[0-9]+)[uU]?\s*$", src, re.M)
+    # The pinned GS101 mailbox source includes /* explanatory register comments */
+    # on the same line as #define. Strip C comments before matching exact tokens.
+    src = re.sub(r"/\*.*?\*/|//[^\n]*", "", src, flags=re.S)
+    match = re.search(r"^\s*#define\s+" + re.escape(name) +
+                      r"\s+(0[xX][a-fA-F0-9]+|[0-9]+)[uU]?\s*$", src, re.M)
     return None if match is None else int(match.group(1), 0)
 
 
