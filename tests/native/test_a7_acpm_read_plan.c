@@ -147,6 +147,31 @@ static void test_mock_read_lifecycle(void)
 	assert(state.last_observed_ms == 105U);
 	assert(state.response_value == 0x55U && state.firmware_status == 0);
 
+	/*
+	 * Integration regression: two valid-looking replies for one request
+	 * must not complete the lifecycle or publish an untrusted value.
+	 */
+	assert(a7_acpm_begin_read_lifecycle(&request, 150, 20, &state) == 0);
+	replies[1].word[0] = request.request.word[0];
+	replies[1].word[1] = 0x99U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT;
+	before = state;
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 2, 151) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+	replies[1].word[0] = 0;
+	/* A forged PMIC wire-channel bit cannot finish a pending request. */
+	replies[0].word[0] = request.request.word[0] | (1U << 12);
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 152) == 0);
+	assert(state.state == A7_ACPM_WAIT_PENDING);
+	assert(state.response_value == 0);
+	/* A corrected single reply can now finish this session. */
+	replies[0].word[0] = request.request.word[0];
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 153) == 0);
+	assert(state.state == A7_ACPM_WAIT_SUCCESS);
+	assert(state.response_value == 0x55U);
+
 	/* Firmware errors must not expose data as successful PMIC reads. */
 	assert(a7_acpm_begin_read_lifecycle(&request, 200, 20, &state) == 0);
 	replies[0].word[1] = (3U << A7_ACPM_READ_RESPONSE_STATUS_SHIFT) |
