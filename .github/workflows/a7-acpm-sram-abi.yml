@@ -1,0 +1,116 @@
+name: A7 Exynos7885 ACPM SRAM 6.15 ABI static + ARM64 compile (NOT DRIVER)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-sram-abi.yml'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.*'
+      - 'tools/check_a7_acpm_sram_layout.py'
+      - 'tests/test_a7_acpm_sram_layout.py'
+      - 'tests/native/test_a7_acpm_sram_abi.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-a7-acpm-sram-abi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout ACPM ABI source (no firmware/phone)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate native C 32-bit SRAM offsets and bounded channel data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p abi-evidence
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iport/linux-6.15/drivers/firmware/samsung \
+            port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.c \
+            tests/native/test_a7_acpm_sram_abi.c \
+            -o "$RUNNER_TEMP/a7-acpm-sram-abi-host"
+          "$RUNNER_TEMP/a7-acpm-sram-abi-host" | tee abi-evidence/host-c-test.log
+          python3 -m unittest discover -s tests -p test_a7_acpm_sram_layout.py -v
+
+      - name: Fetch immutable old Samsung and modern Linux 6.15 ACPM ABI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          old=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5
+          modern=https://raw.githubusercontent.com/Mollomm1/linux-exynos7885/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          curl -fLsS --retry 3 "$old/drivers/soc/samsung/acpm/fw_header/framework.h" \
+            -o abi-evidence/samsung-exynos7885-framework.h
+          curl -fLsS --retry 3 "$modern/drivers/firmware/samsung/exynos-acpm.c" \
+            -o abi-evidence/linux615-exynos-acpm.c
+          test -s abi-evidence/samsung-exynos7885-framework.h
+          test -s abi-evidence/linux615-exynos-acpm.c
+          python3 tools/check_a7_acpm_sram_layout.py \
+            --old-framework abi-evidence/samsung-exynos7885-framework.h \
+            --new-acpm abi-evidence/linux615-exynos-acpm.c \
+            | tee abi-evidence/source-abi-results.log
+          sha256sum abi-evidence/samsung-exynos7885-framework.h \
+            abi-evidence/linux615-exynos-acpm.c \
+            > abi-evidence/pinned-source-sha256.txt
+
+      - name: Install AArch64 Linux 6.15 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch source-pinned experimental Linux 6.15 Exynos7885 tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+
+      - name: Compile genuine AArch64 kernel object with ABI layout assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.* \
+            kernel/drivers/firmware/samsung/
+          ! grep -q 'exynos7885-acpm-sram-abi-lab' kernel/drivers/firmware/samsung/Makefile
+          make -C kernel O="$GITHUB_WORKSPACE/abi-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee abi-evidence/defconfig.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/abi-out" ARCH=arm64 LLVM=1 \
+            drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.o \
+            2>&1 | tee abi-evidence/arm64-compile.log
+          obj=abi-out/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.o
+          test -s "$obj"
+          readelf -h "$obj" | tee abi-evidence/elf-header.txt
+          readelf -h "$obj" | grep -q 'Machine:.*AArch64'
+          sha256sum "$obj" > abi-evidence/arm64-sha256.txt
+
+      - name: Save test evidence only, no firmware or flashable binary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-acpm-sram-abi-source-and-compiler-evidence-only
+          path: |
+            abi-evidence/*.txt
+            abi-evidence/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve hard blocked status
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Exynos7885 historical ACPM channel ABI compared to Linux 6.15'
+            echo 'Pure C struct offsets and source-declaration cross-check. No hardware access.'
+            echo 'Old framework channel pointer/count and 72-byte channel descriptors align with modern parser fields.'
+            echo 'Modern GS101-only mailbox and ACPM controller still do NOT support Exynos7885 hardware.'
+            echo 'A successful compiler job does NOT validate firmware, SRAM access, a PMIC or Android 17 boot.'
+          } >> "$GITHUB_STEP_SUMMARY"
