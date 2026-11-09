@@ -14,6 +14,7 @@ int main(void)
 	fw.ipc_channels = 0x900;
 	fw.ipc_ap_max = 4;
 	ch.id = 2;
+	ch.type = A7_ACPM_QUEUE_TYPE;
 	ch.ap_poll = 1;
 	ch.ch.q_len = 4;
 	ch.ch.q_elem_size = 16;
@@ -68,6 +69,10 @@ int main(void)
 	assert(a7_acpm_prepare_s2mpu08_read(
 		       &fw, &ch, 2, 0, 0, 1, 0, 0, &plan) == -1);
 	ch.ch.q_elem_size = 16;
+	ch.type = A7_ACPM_BUFFER_TYPE;
+	assert(a7_acpm_prepare_s2mpu08_read(
+		       &fw, &ch, 2, 0, 0, 1, 0, 0, &plan) == -1);
+	ch.type = A7_ACPM_QUEUE_TYPE;
 	assert(memcmp(&previous, &plan, sizeof(plan)) == 0);
 	puts("PASS: 63 read sequence frames, ring wrap, full queue and invalid offsets in ordinary RAM");
 	puts("No memory-mapped IO, firmware, real mailbox send, voltage control or bootability.");
