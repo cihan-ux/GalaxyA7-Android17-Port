@@ -272,3 +272,47 @@ int a7_acpm_next_unquarantined_sequence(
 
 	return A7_ACPM_READ_PLAN_ERROR;
 }
+
+/*
+ * Offline integration boundary: three previously independently tested
+ * routines compose in ordinary host memory. No firmware/APM queue write.
+ * Mutate outputs only after all validation succeeds.
+ */
+int a7_acpm_prepare_begin_s2mpu08_read(
+	const struct a7_legacy_framework_prefix *framework,
+	const struct a7_legacy_ipc_channel *channel,
+	unsigned int pmic_type, unsigned int reg,
+	unsigned int previous_sequence,
+	unsigned int front, unsigned int rear,
+	unsigned int start_ms, unsigned int timeout_ms,
+	struct a7_acpm_read_lifecycle *lifecycle,
+	struct a7_acpm_read_plan *out_plan,
+	unsigned int *out_sequence)
+{
+	struct a7_acpm_read_lifecycle pending;
+	struct a7_acpm_read_plan planned;
+	unsigned int seq;
+
+	if (!framework || !channel || !lifecycle || !out_plan ||
+	    !out_sequence)
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	if (a7_acpm_next_unquarantined_sequence(
+			lifecycle, previous_sequence, &seq))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	if (a7_acpm_prepare_s2mpu08_read(
+			framework, channel, A7_ACPM_PMIC_CHANNEL,
+			pmic_type, reg, seq, front, rear, &planned))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	pending = *lifecycle;
+	if (a7_acpm_begin_read_lifecycle(
+			&planned, start_ms, timeout_ms, &pending))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	*lifecycle = pending;
+	*out_plan = planned;
+	*out_sequence = seq;
+	return 0;
+}

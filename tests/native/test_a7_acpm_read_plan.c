@@ -230,8 +230,83 @@ static void test_mock_safe_sequence_allocation(void)
 	puts("PASS: offline 1..63 ACPM sequence allocator skips quarantine and fails closed on exhaustion");
 }
 
+static void test_offline_atomic_read_begin(void)
+{
+	struct a7_legacy_framework_prefix fw = {0};
+	struct a7_legacy_ipc_channel ch = {0};
+	struct a7_acpm_read_lifecycle life = {0}, prior_life;
+	struct a7_acpm_read_plan plan = {0}, prior_plan;
+	unsigned int sequence = 12345U, prior_sequence;
+	fw.ipc_channels = 0x900;
+	fw.ipc_ap_max = 4;
+	ch.id = 2;
+	ch.type = A7_ACPM_QUEUE_TYPE;
+	ch.ap_poll = 1;
+	ch.ch.q_len = 4;
+	ch.ch.q_elem_size = 16;
+	ch.ch.rx_rear = 0x100;
+	ch.ch.rx_front = 0x104;
+	ch.ch.tx_rear = 0x108;
+	ch.ch.tx_front = 0x10c;
+	ch.ch.rx_base = 0x200;
+	ch.ch.tx_base = 0x400;
+	life.quarantined_sequence_low = (1U << 7) | (1U << 8);
+
+	/* The new session picks 9 after skipped timed-out IDs 7 and 8. */
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 6, 2, 1, 200, 30,
+		&life, &plan, &sequence) == 0);
+	assert(sequence == 9 && plan.sequence == 9);
+	assert(plan.queue_entry_offset == 0x220);
+	assert(plan.request.word[0] == ((9U << 16) | 0x14fU));
+	assert(life.state == A7_ACPM_WAIT_PENDING);
+	assert(life.sequence == 9 && life.start_ms == 200);
+	assert(life.quarantined_sequence_low & (1U << 7));
+	assert(life.quarantined_sequence_low & (1U << 8));
+	prior_life = life;
+	prior_plan = plan;
+	prior_sequence = sequence;
+
+	/* No overwrite while a request is outstanding. */
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 9, 2, 1, 210, 30,
+		&life, &plan, &sequence) == -1);
+	assert(memcmp(&prior_life, &life, sizeof(life)) == 0);
+	assert(memcmp(&prior_plan, &plan, sizeof(plan)) == 0);
+	assert(sequence == prior_sequence);
+
+	/* After expiry, the same sequence becomes quarantined; use 10. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&life, &plan, NULL, 0, 0, 0, 230) == 0);
+	assert(life.state == A7_ACPM_WAIT_EXPIRED);
+	assert(life.quarantined_sequence_low & (1U << 9));
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 9, 2, 1, 300, 30,
+		&life, &plan, &sequence) == 0);
+	assert(sequence == 10 && life.sequence == 10);
+
+	/* A full queue and invalid lifetime reject atomically. */
+	prior_life = life;
+	prior_plan = plan;
+	prior_sequence = sequence;
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 10, 1, 2, 305, 30,
+		&life, &plan, &sequence) == -1);
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 10, 2, 1, 305, 0,
+		&life, &plan, &sequence) == -1);
+	assert(memcmp(&prior_life, &life, sizeof(life)) == 0);
+	assert(memcmp(&prior_plan, &plan, sizeof(plan)) == 0);
+	assert(sequence == prior_sequence);
+	assert(a7_acpm_prepare_begin_s2mpu08_read(
+		&fw, &ch, 1, 0x4f, 10, 2, 1, 305, 30,
+		&life, NULL, &sequence) == -1);
+	puts("PASS: synthetic PMIC read start composes sequence, bounded ring, and lifecycle atomically");
+}
+
 int main(void)
 {
+	test_offline_atomic_read_begin();
 	test_mock_safe_sequence_allocation();
 	test_mock_read_lifecycle();
 	check_mock_reply_matching();

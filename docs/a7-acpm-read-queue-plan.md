@@ -79,3 +79,17 @@ sample, wraparound near `0xffffffff`, timely completion and expiry. This
 is a defensive **model-input check**; a real ACPM driver still needs a
 verified monotonic clock, proper timeout/synchronization and firmware
 queue ownership.
+
+
+### Atomic, entirely offline request initiation
+
+`a7_acpm_prepare_begin_s2mpu08_read()` is a small integration entry
+point which calls the bounded sequence allocator, A7 firmware channel
+and ring validator, S2MPU08 read-frame packer and lifecycle initializer.
+It prepares local temporary structures first, then updates the caller's
+lifecycle, request plan and chosen sequence **only when all checks pass**.
+It rejects pending-request replacement and returns without partial writes
+on ring full, invalid timeout or malformed device metadata. C tests
+simulate a timed-out sequence 9 being quarantined and next choosing 10.
+This models the logic *before* a real firmware transaction and still does
+not touch physical SRAM, registers, locks or PMIC power.

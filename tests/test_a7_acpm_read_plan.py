@@ -64,6 +64,11 @@ class ReadPlanSafetyTests(unittest.TestCase):
                 "since_last == 0x80000000U"),
             self.header))
 
+    def test_reject_atomic_begin_commit_removed(self):
+        self.assertTrue(audit(
+            self.source.replace("*out_plan = planned", "*out_plan = *out_plan"),
+            self.header))
+
     def test_reject_real_sleep_or_clock_api(self):
         self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
 

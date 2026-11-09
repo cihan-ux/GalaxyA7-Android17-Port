@@ -128,4 +128,24 @@ int a7_acpm_next_unquarantined_sequence(
 	const struct a7_acpm_read_lifecycle *lifecycle,
 	unsigned int previous_sequence, unsigned int *next_sequence);
 
+/*
+ * Atomically plan (in caller RAM only) a sequential synthetic PMIC read:
+ * choose a non-quarantined 1..63 sequence, check ring capacity/board
+ * geometry, then start a bounded lifecycle. On ANY failure none of the
+ * caller-visible output plan, sequence or lifecycle objects change.
+ *
+ * No MMIO, mailbox/SRAM write, firmware lock, physical PMIC I/O or kernel
+ * driver registration is implemented by this research-only composition.
+ */
+int a7_acpm_prepare_begin_s2mpu08_read(
+	const struct a7_legacy_framework_prefix *framework,
+	const struct a7_legacy_ipc_channel *channel,
+	unsigned int pmic_type, unsigned int reg,
+	unsigned int previous_sequence,
+	unsigned int front, unsigned int rear,
+	unsigned int start_ms, unsigned int timeout_ms,
+	struct a7_acpm_read_lifecycle *lifecycle,
+	struct a7_acpm_read_plan *out_plan,
+	unsigned int *out_sequence);
+
 #endif
