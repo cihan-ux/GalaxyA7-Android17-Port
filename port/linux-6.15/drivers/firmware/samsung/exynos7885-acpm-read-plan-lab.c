@@ -30,6 +30,7 @@ int a7_acpm_prepare_s2mpu08_read(
 
 	if (!framework || !channel || !out ||
 	    transport_channel != A7_ACPM_PMIC_CHANNEL ||
+	    channel->type != A7_ACPM_QUEUE_TYPE ||
 	    seq < A7_ACPM_READ_SEQUENCE_MIN ||
 	    seq > A7_ACPM_READ_SEQUENCE_MAX ||
 	    a7_acpm_validate_fw_prefix(framework, A7_ACPM_SRAM_BYTES,
