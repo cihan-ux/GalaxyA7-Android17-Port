@@ -69,6 +69,15 @@ class ReadPlanSafetyTests(unittest.TestCase):
             self.source.replace("*out_plan = planned", "*out_plan = *out_plan"),
             self.header))
 
+    def test_reject_removed_session_state_validation(self):
+        self.assertTrue(audit(
+            self.source.replace("life->state > A7_ACPM_WAIT_EXPIRED",
+                                "life->state > 999U"), self.header))
+        self.assertTrue(audit(
+            self.source.replace(
+                "(start_ms - lifecycle->last_observed_ms) >= 0x80000000U",
+                "start_ms == lifecycle->last_observed_ms"), self.header))
+
     def test_reject_real_sleep_or_clock_api(self):
         self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
 

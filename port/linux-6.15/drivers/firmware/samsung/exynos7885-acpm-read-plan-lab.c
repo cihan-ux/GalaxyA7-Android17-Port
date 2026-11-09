@@ -124,6 +124,56 @@ int a7_acpm_match_s2mpu08_read_reply(
 	return A7_ACPM_REPLY_NOT_FOUND;
 }
 
+
+/*
+ * Validate caller-provided session metadata before either reusing it or
+ * choosing a sequence. This is not a hardware concurrency primitive.
+ * The fresh session is a zero-initialized struct, optionally preloaded
+ * with known timed-out sequence quarantine bits.
+ */
+static int a7_acpm_valid_lifecycle(const struct a7_acpm_read_lifecycle *life)
+{
+	unsigned int quarantined;
+
+	if (!life || life->state > A7_ACPM_WAIT_EXPIRED ||
+	    life->timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS)
+		return 0;
+
+	if (!life->timeout_ms)
+		return life->state == A7_ACPM_WAIT_PENDING &&
+		       life->sequence == 0 && life->command_word0 == 0 &&
+		       life->start_ms == 0 && life->last_observed_ms == 0 &&
+		       life->firmware_status == 0 && life->response_value == 0;
+
+	if (life->sequence < A7_ACPM_READ_SEQUENCE_MIN ||
+	    life->sequence > A7_ACPM_READ_SEQUENCE_MAX ||
+	    (life->command_word0 & A7_ACPM_LIFECYCLE_SEQ_MASK) !=
+		(life->sequence << A7_ACPM_READ_SEQUENCE_SHIFT) ||
+	    (life->last_observed_ms - life->start_ms) >= 0x80000000U)
+		return 0;
+
+	quarantined = life->sequence < 32U ?
+		(life->quarantined_sequence_low & (1U << life->sequence)) :
+		(life->quarantined_sequence_high &
+		 (1U << (life->sequence - 32U)));
+
+	switch (life->state) {
+	case A7_ACPM_WAIT_PENDING:
+		return !life->firmware_status && !life->response_value &&
+		       !quarantined;
+	case A7_ACPM_WAIT_SUCCESS:
+		return !life->firmware_status && !quarantined;
+	case A7_ACPM_WAIT_FIRMWARE_ERR:
+		return life->firmware_status && !life->response_value &&
+		       !quarantined;
+	case A7_ACPM_WAIT_EXPIRED:
+		return quarantined && !life->firmware_status &&
+		       !life->response_value;
+	default:
+		return 0;
+	}
+}
+
 /*
  * Pure-memory lifecycle model for request/reply and a synthetic monotonic
  * unsigned 32-bit millisecond clock. No actual firmware timing is asserted.
@@ -136,8 +186,10 @@ int a7_acpm_begin_read_lifecycle(
 	struct a7_acpm_read_lifecycle next;
 	unsigned int seq_mask = 0x3fU << A7_ACPM_READ_SEQUENCE_SHIFT;
 
-	if (!request || !lifecycle || !timeout_ms ||
-	    timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS ||
+	if (!request || !lifecycle || !a7_acpm_valid_lifecycle(lifecycle) ||
+	    !timeout_ms || timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS ||
+	    (lifecycle->timeout_ms &&
+	     (start_ms - lifecycle->last_observed_ms) >= 0x80000000U) ||
 	    request->channel_id != A7_ACPM_PMIC_CHANNEL ||
 	    request->sequence < A7_ACPM_READ_SEQUENCE_MIN ||
 	    request->sequence > A7_ACPM_READ_SEQUENCE_MAX ||
@@ -179,8 +231,8 @@ int a7_acpm_advance_read_lifecycle(
 	unsigned int elapsed, since_last;
 	int result;
 
-	if (!lifecycle || !request || !lifecycle->timeout_ms ||
-	    lifecycle->timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS ||
+	if (!lifecycle || !request || !a7_acpm_valid_lifecycle(lifecycle) ||
+	    !lifecycle->timeout_ms ||
 	    lifecycle->sequence != request->sequence ||
 	    lifecycle->command_word0 != request->request.word[0] ||
 	    request->channel_id != A7_ACPM_PMIC_CHANNEL)
@@ -249,6 +301,7 @@ int a7_acpm_next_unquarantined_sequence(
 	unsigned int candidate, checked, mask;
 
 	if (!lifecycle || !next_sequence ||
+	    !a7_acpm_valid_lifecycle(lifecycle) ||
 	    previous_sequence > A7_ACPM_READ_SEQUENCE_MAX ||
 	    (lifecycle->state == A7_ACPM_WAIT_PENDING &&
 	     lifecycle->timeout_ms))

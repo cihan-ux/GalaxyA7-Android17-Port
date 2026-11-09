@@ -76,6 +76,9 @@ int a7_acpm_match_s2mpu08_read_reply(
 #define A7_ACPM_WAIT_FIRMWARE_ERR  2U
 #define A7_ACPM_WAIT_EXPIRED       3U
 #define A7_ACPM_WAIT_ALREADY_DONE  1
+/* The six-bit request sequence lives in command bits 21:16. */
+#define A7_ACPM_LIFECYCLE_SEQ_MASK (63U << A7_ACPM_READ_SEQUENCE_SHIFT)
+
 
 struct a7_acpm_read_lifecycle {
 	unsigned int state;
@@ -94,7 +97,9 @@ struct a7_acpm_read_lifecycle {
 /*
  * Zero-initialize before the first begin. A pending request cannot be
  * replaced. A terminal request can restart only with a non-quarantined
- * sequence. No unverified automatic quarantine-clearing API is provided.
+ * sequence. A previously completed lifecycle cannot be restarted with a
+ * regressed or ambiguous caller-supplied clock. Corrupted/unknown state
+ * values are rejected. No unverified quarantine-clearing API is provided.
  */
 int a7_acpm_begin_read_lifecycle(
 	const struct a7_acpm_read_plan *request,

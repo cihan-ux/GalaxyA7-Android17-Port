@@ -93,3 +93,21 @@ on ring full, invalid timeout or malformed device metadata. C tests
 simulate a timed-out sequence 9 being quarantined and next choosing 10.
 This models the logic *before* a real firmware transaction and still does
 not touch physical SRAM, registers, locks or PMIC power.
+
+
+### Lifecycle integrity and cross-session fake-clock validation
+
+The pure-C research lifecycle now validates the *whole caller-supplied session
+state* rather than accepting unknown state enum values as if they were
+completed reads. Fresh sessions are zero-initialized apart from optional
+preloaded quarantine bits; running and completed sessions must have
+internally consistent sequence, command, timestamps, status and timeout
+fields. Failed validation leaves all caller-visible outputs untouched.
+
+A new session may not start with a caller-supplied time sample *before* the
+previous completed sample (or an ambiguous half-range jump). This prevents
+a synthetic stale clock value from silently restarting a read after a
+successful/failed prior operation. The C tests explicitly try a corrupt
+state enum, non-fresh zero-timeout state, fake expired state, malformed
+in-flight status, backwards restart and future half-range jump. These are
+algorithm safeguards only, not on-device clock or firmware evidence.

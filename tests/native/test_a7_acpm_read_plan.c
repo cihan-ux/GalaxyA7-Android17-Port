@@ -319,8 +319,76 @@ static void test_offline_atomic_read_begin(void)
 	puts("PASS: synthetic PMIC read start composes sequence, bounded ring, and lifecycle atomically");
 }
 
+
+static void test_lifecycle_corruption_and_cross_session_clock(void)
+{
+	struct a7_acpm_read_plan req = {0};
+	struct a7_acpm_read_lifecycle life = {0}, previous;
+	unsigned int chosen = 0xaabbccddU;
+
+	req.channel_id = A7_ACPM_PMIC_CHANNEL;
+	req.sequence = 7;
+	req.request.word[0] = (7U << 16) | 0x14fU;
+	req.doorbell_offset = A7_ACPM_DOORBELL_INTGR0_OFFSET;
+	req.doorbell_value = 0x40000U;
+
+	/* A corrupted state enum may not be treated as a terminal session. */
+	life.state = 99;
+	previous = life;
+	assert(a7_acpm_begin_read_lifecycle(&req, 100, 20, &life) == -1);
+	assert(a7_acpm_next_unquarantined_sequence(&life, 0, &chosen) == -1);
+	assert(chosen == 0xaabbccddU);
+	assert(memcmp(&previous, &life, sizeof(life)) == 0);
+
+	/* A non-empty but timeout-less struct is not fresh/zero-initialized. */
+	memset(&life, 0, sizeof(life));
+	life.sequence = 7;
+	assert(a7_acpm_begin_read_lifecycle(&req, 100, 20, &life) == -1);
+
+	memset(&life, 0, sizeof(life));
+	assert(a7_acpm_begin_read_lifecycle(&req, 1000, 20, &life) == 0);
+	/* A synthetic reply completing at time 1005. */
+	{
+		struct s2mpu08_a7_acpm_frame response[2] = {{{0}}};
+		response[0].word[0] = req.request.word[0];
+		response[0].word[1] = 0x5aU << A7_ACPM_READ_RESPONSE_VALUE_SHIFT;
+		assert(a7_acpm_advance_read_lifecycle(
+			&life, &req, response, 2, 0, 1, 1005) == 0);
+	}
+	assert(life.state == A7_ACPM_WAIT_SUCCESS);
+
+	/* Future read identity uses seq=8. Starting before prior completion
+	 * or >=2^31ms away violates the fake-clock provenance.
+	 */
+	req.sequence = 8;
+	req.request.word[0] = (8U << 16) | 0x14fU;
+	previous = life;
+	assert(a7_acpm_begin_read_lifecycle(&req, 1004, 20, &life) == -1);
+	assert(a7_acpm_begin_read_lifecycle(
+		&req, 1005U + 0x80000000U, 20, &life) == -1);
+	assert(memcmp(&previous, &life, sizeof(life)) == 0);
+	assert(a7_acpm_begin_read_lifecycle(&req, 1006, 20, &life) == 0);
+	assert(life.state == A7_ACPM_WAIT_PENDING);
+
+	/* A malformed pending response must not alter state. */
+	life.firmware_status = 3;
+	previous = life;
+	assert(a7_acpm_advance_read_lifecycle(
+		&life, &req, NULL, 0, 0, 0, 1010) == -1);
+	assert(memcmp(&previous, &life, sizeof(life)) == 0);
+
+	/* A fake expired state with no quarantine is equally invalid. */
+	life.state = A7_ACPM_WAIT_EXPIRED;
+	life.firmware_status = 0;
+	previous = life;
+	assert(a7_acpm_next_unquarantined_sequence(&life, 8, &chosen) == -1);
+	assert(memcmp(&previous, &life, sizeof(life)) == 0);
+	puts("PASS: invalid ACPM lifecycle state and cross-session clock regressions rejected");
+}
+
 int main(void)
 {
+	test_lifecycle_corruption_and_cross_session_clock();
 	test_offline_atomic_read_begin();
 	test_mock_safe_sequence_allocation();
 	test_mock_read_lifecycle();
