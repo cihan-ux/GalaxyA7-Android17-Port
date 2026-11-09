@@ -34,6 +34,11 @@ class ReadPlanSafetyTests(unittest.TestCase):
                 "(word & 0x0fffU) != (request->request.word[0] & 0x0fffU)"),
             self.header))
 
+    def test_reject_removing_ambiguous_duplicate_reply_guard(self):
+        self.assertTrue(audit(
+            self.source.replace("match_count > 1U", "match_count > 99U"),
+            self.header))
+
     def test_reject_unsafe_response_queue_mutation(self):
         self.assertTrue(audit(
             self.source + "\nmemmove(queue + 1, queue, 4);", self.header))

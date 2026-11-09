@@ -38,6 +38,8 @@ def audit(source, header):
         "decision.firmware_status = status",
         "decision.next_rear = (rear + 1U) % ring_count",
         "decision.requires_rear_swap = position != rear",
+        "match_count > 1U",
+        "if (match_count == 1U)",
         "a7_acpm_begin_read_lifecycle(",
         "a7_acpm_advance_read_lifecycle(",
         "elapsed = observed_ms - lifecycle->start_ms",

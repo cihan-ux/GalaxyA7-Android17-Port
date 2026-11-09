@@ -116,3 +116,15 @@ algorithm safeguards only, not on-device clock or firmware evidence.
 ### Latest lifecycle-integrity AArch64 verification
 
 [CI 42705811004](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42705811004) **passed** the entire new lifecycle-integrity check: native C regression cases, historical Samsung source comparisons, offline guards, and three pinned Linux 6.15 AArch64 compiler objects. The tests now also reject corrupted session states and cross-session backwards or ambiguous synthetic-clock restarts. **This is not firmware execution or an Android 17 ROM.**
+
+
+### Duplicate reply identity rejection
+
+The historical RX reader stops at the first matching six-bit sequence.
+The offline simulator deliberately **fails closed** when two queued
+responses have the same sequence and PMIC type/register identity.
+Otherwise a delayed duplicate could be accepted as the current read.
+It scans the full synthetic ring before publishing a result; a duplicate
+returns an error and leaves the caller's output untouched. This is a
+conservative additional safeguard, not a claim about real firmware
+deduplication or queue ownership.

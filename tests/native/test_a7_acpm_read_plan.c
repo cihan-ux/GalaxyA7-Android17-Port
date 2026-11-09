@@ -37,6 +37,13 @@ static void check_mock_reply_matching(void)
 	assert(decision.firmware_status == 2);
 	assert(decision.response_value == 0);
 	previous = decision;
+	/* Two matching responses cannot be safely attributed to one read. */
+	replies[3].word[0] = request.request.word[0];
+	replies[3].word[1] = (0x44U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT);
+	assert(a7_acpm_match_s2mpu08_read_reply(&request, replies, 4, 3, 2,
+						&decision) == -1);
+	assert(memcmp(&decision, &previous, sizeof(decision)) == 0);
+	replies[3].word[0] = (6U << 16) | 0x14fU;
 	/* Ignore mismatch and never alter caller's output when no match. */
 	replies[1].word[0] = (8U << 16) | 0x14fU;
 	assert(a7_acpm_match_s2mpu08_read_reply(&request, replies, 4, 3, 2,

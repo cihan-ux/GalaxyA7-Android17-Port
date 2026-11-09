@@ -81,7 +81,7 @@ int a7_acpm_match_s2mpu08_read_reply(
 	struct a7_acpm_reply_decision *out)
 {
 	struct a7_acpm_reply_decision decision;
-	unsigned int position, scanned, word, status;
+	unsigned int position, scanned, word, status, match_count = 0;
 	const unsigned int seq_mask = 0x3fU << A7_ACPM_READ_SEQUENCE_SHIFT;
 
 	if (!request || !ring || !out || ring_count < 2 ||
@@ -115,10 +115,19 @@ int a7_acpm_match_s2mpu08_read_reply(
 				((ring[position].word[1] >>
 				  A7_ACPM_READ_RESPONSE_VALUE_SHIFT) &
 				 A7_ACPM_READ_RESPONSE_BYTE_MASK);
-			*out = decision;
-			return 0;
+			/*
+			 * A second identical request identity is ambiguous.
+			 * Keep scanning before returning a value to the caller.
+			 */
+			match_count++;
+			if (match_count > 1U)
+				return A7_ACPM_READ_PLAN_ERROR;
 		}
 		position = (position + 1U) % ring_count;
+	}
+	if (match_count == 1U) {
+		*out = decision;
+		return 0;
 	}
 	/* Missing matching response, including an empty synthetic queue. */
 	return A7_ACPM_REPLY_NOT_FOUND;
