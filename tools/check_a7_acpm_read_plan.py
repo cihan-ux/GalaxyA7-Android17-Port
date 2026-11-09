@@ -33,9 +33,16 @@ def audit(source, header):
         "layout.mlen != sizeof(frame)",
         "channel->type != A7_ACPM_QUEUE_TYPE",
         "next_front == rear",
+        "a7_acpm_match_s2mpu08_read_reply(",
+        "(word & 0x0fffU) == (request->request.word[0] & 0x0fffU)",
+        "decision.firmware_status = status",
+        "decision.next_rear = (rear + 1U) % ring_count",
+        "decision.requires_rear_swap = position != rear",
     ):
         if needle not in code:
             failures.append("source-validated request guard missing: " + needle)
+    if re.search(r'\b(?:memcpy|memmove|spin_lock|mutex_lock)\s*\(', code):
+        failures.append("offline response plan must not mutate queue or take runtime locks")
     if not re.search(r"#define\s+A7_ACPM_QUEUE_TYPE\s+1U\b", code):
         failures.append("Historical firmware TYPE_QUEUE=1 guard missing")
     if not re.search(r"#define\s+A7_ACPM_DOORBELL_INTGR0_OFFSET\s+0x0008U\b", code):

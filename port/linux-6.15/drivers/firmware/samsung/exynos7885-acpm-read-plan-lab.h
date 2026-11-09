@@ -16,6 +16,10 @@
 #define A7_ACPM_READ_SEQUENCE_SHIFT 16U
 #define A7_ACPM_DOORBELL_INTGR0_OFFSET 0x0008U
 #define A7_ACPM_READ_PLAN_ERROR (-1)
+#define A7_ACPM_REPLY_NOT_FOUND 1
+#define A7_ACPM_READ_RESPONSE_STATUS_SHIFT 24U
+#define A7_ACPM_READ_RESPONSE_VALUE_SHIFT 8U
+#define A7_ACPM_READ_RESPONSE_BYTE_MASK 0xffU
 
 struct a7_acpm_read_plan {
 	unsigned int queue_entry_offset;
@@ -39,4 +43,26 @@ int a7_acpm_prepare_s2mpu08_read(
 	unsigned int pmic_type, unsigned int reg, unsigned int seq,
 	unsigned int front, unsigned int rear,
 	struct a7_acpm_read_plan *out);
+/*
+ * Offline match for a simulated reply-ring snapshot, never actual SRAM.
+ * A successful match is NOT proof of an actual transaction or firmware ack.
+ * The historical reader dequeues a matched slot by moving the rear entry
+ * into its place, then increments rear. Only report the intended actions.
+ */
+struct a7_acpm_reply_decision {
+	unsigned int matched_index;
+	unsigned int next_rear;
+	unsigned int requires_rear_swap;
+	unsigned int would_clear_irq_if_empty;
+	unsigned int firmware_status;
+	unsigned int response_value;
+};
+
+/* 0=matching reply in synthetic ring, 1=no match, -1=invalid input. */
+int a7_acpm_match_s2mpu08_read_reply(
+	const struct a7_acpm_read_plan *request,
+	const struct s2mpu08_a7_acpm_frame *ring,
+	unsigned int ring_count, unsigned int rear, unsigned int front,
+	struct a7_acpm_reply_decision *out);
+
 #endif

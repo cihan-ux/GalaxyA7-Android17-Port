@@ -67,3 +67,59 @@ int a7_acpm_prepare_s2mpu08_read(
 	*out = plan; /* Failure has no partial caller-visible writes. */
 	return 0;
 }
+
+/*
+ * Source-derived simulation of legacy check_response(): compare the six-bit
+ * request sequence, then plan its ring dequeue. We additionally require
+ * type/register parity to fail closed against stale or unrelated frames.
+ * Do not implement firmware IRQ acknowledgement or queue mutation here.
+ */
+int a7_acpm_match_s2mpu08_read_reply(
+	const struct a7_acpm_read_plan *request,
+	const struct s2mpu08_a7_acpm_frame *ring,
+	unsigned int ring_count, unsigned int rear, unsigned int front,
+	struct a7_acpm_reply_decision *out)
+{
+	struct a7_acpm_reply_decision decision;
+	unsigned int position, scanned, word, status;
+	const unsigned int seq_mask = 0x3fU << A7_ACPM_READ_SEQUENCE_SHIFT;
+
+	if (!request || !ring || !out || ring_count < 2 ||
+	    ring_count > A7_ACPM_SRAM_BYTES / sizeof(*ring) ||
+	    rear >= ring_count || front >= ring_count ||
+	    request->channel_id != A7_ACPM_PMIC_CHANNEL ||
+	    request->sequence < A7_ACPM_READ_SEQUENCE_MIN ||
+	    request->sequence > A7_ACPM_READ_SEQUENCE_MAX ||
+	    request->request.word[0] !=
+		((request->request.word[0] & ~seq_mask) |
+		 (request->sequence << A7_ACPM_READ_SEQUENCE_SHIFT)))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	position = rear;
+	for (scanned = 0; position != front && scanned < ring_count; scanned++) {
+		word = ring[position].word[0];
+		if (((word & seq_mask) >> A7_ACPM_READ_SEQUENCE_SHIFT) ==
+		    request->sequence &&
+		    (word & 0x0fffU) == (request->request.word[0] & 0x0fffU)) {
+			status = (ring[position].word[1] >>
+				  A7_ACPM_READ_RESPONSE_STATUS_SHIFT) &
+				 A7_ACPM_READ_RESPONSE_BYTE_MASK;
+			decision.matched_index = position;
+			decision.next_rear = (rear + 1U) % ring_count;
+			decision.requires_rear_swap = position != rear;
+			decision.would_clear_irq_if_empty =
+				decision.next_rear == front;
+			decision.firmware_status = status;
+			/* An error reply does not supply a trusted PMIC value. */
+			decision.response_value = status ? 0 :
+				((ring[position].word[1] >>
+				  A7_ACPM_READ_RESPONSE_VALUE_SHIFT) &
+				 A7_ACPM_READ_RESPONSE_BYTE_MASK);
+			*out = decision;
+			return 0;
+		}
+		position = (position + 1U) % ring_count;
+	}
+	/* Missing matching response, including an empty synthetic queue. */
+	return A7_ACPM_REPLY_NOT_FOUND;
+}

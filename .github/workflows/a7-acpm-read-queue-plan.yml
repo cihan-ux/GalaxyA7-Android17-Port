@@ -54,8 +54,12 @@ jobs:
           grep -Fq 'if (++channel->seq_num == 64)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq '(channel->seq_num & 0x3f) << ACPM_IPC_PROTOCOL_SEQ_NUM' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq '__raw_writel((1 << id) << 16, acpm_ipc->intr + INTGR0)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'static bool check_response(' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq '(data >> ACPM_IPC_PROTOCOL_SEQ_NUM) & 0x3f' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'if (i != rear)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'rear = rear % channel->rx_ch.len;' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq 'acpm_ipc->initdata->ipc_ap_max' "$RUNNER_TEMP/pinned-acpm-ipc.c"
-          echo 'PASS: legacy request sequence 1..63 and AP->APM INTGR0 high bits source pinned' \
+          echo 'PASS: pinned old request sequence, doorbell and response ring matcher source' \
             | tee mock-read-evidence/legacy-sequence-gate.txt
           sha256sum "$RUNNER_TEMP/pinned-acpm-ipc.c" "$RUNNER_TEMP/pinned-acpm-framework.h" \
             > mock-read-evidence/old-ipc-source-sha256.txt
@@ -106,7 +110,7 @@ jobs:
             readelf -h "$f" | grep -q 'Machine:.*AArch64'
             sha256sum "$f" | tee -a mock-read-evidence/arm64-objects-sha256.txt
           done
-          echo 'PASS: three AArch64 objects; NO platform driver, mailbox write or device use' \
+          echo 'PASS: 3 AArch64 objects including inert read request+reply match; no device I/O' \
             | tee mock-read-evidence/scope.txt
 
       - name: Archive source/compiler evidence only

@@ -11,3 +11,11 @@ For a successful mock request, the planner returns only **plain integers**: an i
 ## Still missing
 
 No code in this component maps physical A7 SRAM, touches MMIO, sends a mailbox, holds firmware locks, handles IRQs, changes PMIC voltage or registers with a platform device. Real-world ACPM queue concurrency and ownership are not solved by validating synthetic snapshots. The separate [Kbuild mailbox prototype](a7-mailbox-linux615-kbuild-integration.md) remains unbound and must not be flashed. S2MPU08 MFD/regulator integration, RAM carveouts, vendor interfaces, VINTF/SELinux and Android 17 device boot are still blocked.
+
+## Reply matching phase (new)
+
+A second pure C routine, `a7_acpm_match_s2mpu08_read_reply`, examines a **synthetic** four-word response queue, without touching firmware memory or calling a mailbox. Based on historical `check_response()`, it scans from RX rear to front with wraparound, matches the request's six-bit sequence and **also** checks PMIC type/register to avoid accepting an unrelated stale response. It reports matching index, proposed rear advance, whether the legacy reader would swap a rear entry into the matched slot and whether the ring would become empty. It **never performs** a queue mutation or sends an interrupt acknowledgement.
+
+Firmware status is extracted from the high response byte. Failed firmware replies do not return a PMIC value. A missing reply leaves the output unchanged, allowing higher-level code to implement carefully bounded wait/timeout handling later. The tests include a wrapped ring with stale sequence and wrong register, a correct response, firmware error status, an empty queue, invalid indices and null pointers. Source pins in CI check the legacy `check_response()` behavior.
+
+This establishes **algorithm-level compatibility only**. No real firmware response was sampled; it does not validate the hardware queue, locking, synchronization, timeout or PMIC write correctness.

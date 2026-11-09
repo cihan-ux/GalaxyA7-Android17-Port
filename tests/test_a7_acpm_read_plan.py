@@ -27,6 +27,17 @@ class ReadPlanSafetyTests(unittest.TestCase):
             self.source.replace("channel->type != A7_ACPM_QUEUE_TYPE",
                                 "channel->type != A7_ACPM_BUFFER_TYPE"), self.header))
 
+    def test_reject_missing_response_sequence_and_register_match(self):
+        self.assertTrue(audit(
+            self.source.replace(
+                "(word & 0x0fffU) == (request->request.word[0] & 0x0fffU)",
+                "(word & 0x0fffU) != (request->request.word[0] & 0x0fffU)"),
+            self.header))
+
+    def test_reject_unsafe_response_queue_mutation(self):
+        self.assertTrue(audit(
+            self.source + "\\nmemmove(queue + 1, queue, 4);", self.header))
+
     def test_reject_wrong_doorbell(self):
         self.assertTrue(audit(self.source, self.header.replace(
             "A7_ACPM_DOORBELL_INTGR0_OFFSET 0x0008U",
