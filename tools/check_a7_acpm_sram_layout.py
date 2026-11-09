@@ -19,7 +19,17 @@ def fields(src, name):
     chunks = re.findall(r"\bstruct\s+" + re.escape(name) + r"\s*\{(.*?)\}\s*;", scrub(src), re.S)
     if len(chunks) != 1:
         raise ValueError("Missing/ambiguous struct " + name)
-    body = re.sub(r"^\s*#(?:ifn?def|else|endif).*?$", "", chunks[0], flags=re.M)
+    body = chunks[0]
+    # Historical framework.h has two conditional pointer/u32 declarations.
+    # With CONFIG_EXYNOS_ACPM the on-SRAM ABI uses the #else u32 fields.
+    body = re.sub(
+        r"^\s*#ifndef\s+CONFIG_EXYNOS_ACPM\s*\n(.*?)"
+        r"^\s*#else\s*\n(.*?)^\s*#endif\s*$",
+        lambda match: match.group(2),
+        body,
+        flags=re.M | re.S,
+    )
+    body = re.sub(r"^\s*#(?:ifn?def|else|endif).*?$", "", body, flags=re.M)
     return re.findall(r"\b([a-zA-Z_]\w*)\s*(?:\[[0-9]+\])?\s*;", body)
 
 
