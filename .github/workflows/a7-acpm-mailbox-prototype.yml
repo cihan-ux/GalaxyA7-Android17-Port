@@ -35,6 +35,8 @@ jobs:
           modern=https://raw.githubusercontent.com/Mollomm1/linux-exynos7885/c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
           curl -fLsS --retry 3 "$old/drivers/soc/samsung/acpm/acpm_ipc.h" \
             -o mbox-evidence/old-acpm-ipc.h
+          curl -fLsS --retry 3 "$old/drivers/soc/samsung/acpm/acpm_ipc.c" \
+            -o mbox-evidence/old-acpm-ipc.c
           curl -fLsS --retry 3 "$modern/drivers/mailbox/exynos-mailbox.c" \
             -o mbox-evidence/new-exynos-mailbox.c
           curl -fLsS --retry 3 "$modern/drivers/mailbox/Makefile" \
@@ -43,11 +45,12 @@ jobs:
             -o mbox-evidence/kernel-mailbox-Kconfig
           python3 tools/check_exynos7885_acpm_mailbox_prototype.py \
             --old-header mbox-evidence/old-acpm-ipc.h \
+            --old-implementation mbox-evidence/old-acpm-ipc.c \
             --modern-mailbox mbox-evidence/new-exynos-mailbox.c \
             --kernel-makefile mbox-evidence/kernel-mailbox-Makefile \
             --kernel-kconfig mbox-evidence/kernel-mailbox-Kconfig \
             | tee mbox-evidence/provenance-result.log
-          sha256sum mbox-evidence/old-acpm-ipc.h \
+          sha256sum mbox-evidence/old-acpm-ipc.h mbox-evidence/old-acpm-ipc.c \
             mbox-evidence/new-exynos-mailbox.c \
             > mbox-evidence/pinned-source-sha256.txt
 
@@ -106,7 +109,7 @@ jobs:
         run: |
           {
             echo '## Exynos7885 AP2APM mailbox prototype, not active in any kernel'
-            echo 'Old A7 INTGR1=0x1c vs GS101 INTGR1=0x40; old INTMR0=0x10 vs GS101=0x28.'
+            echo 'Legacy AP->APM sends BIT(channel)<<16 to INTGR0=0x08; GS101 uses INTGR1=0x40.'
             echo 'Uses separate prototype-only compatible; no DT, Kconfig or Makefile registration.'
             echo 'A compiled .o is not firmware IPC functionality. No phone access or flashable image.'
             echo 'Before binding, need validated Exynos7885 firmware state, mailbox clock, shared SRAM and IRQ semantics.'
