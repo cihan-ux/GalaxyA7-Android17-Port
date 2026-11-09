@@ -10,7 +10,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "port/linux-6.15/drivers/mailbox/exynos7885-acpm-mbox-prototype.c"
 REQUIRED = {
-    "EXYNOS7885_ACPM_INTGR1": 0x1c,
+    "EXYNOS7885_ACPM_INTGR0": 0x08,
     "EXYNOS7885_ACPM_INTMR0": 0x10,
     "EXYNOS7885_ACPM_INTMR1": 0x24,
     "EXYNOS7885_ACPM_MAX_CHANNELS": 16,
@@ -26,18 +26,25 @@ def define_value(src, name):
     return None if match is None else int(match.group(1), 0)
 
 
-def audit(proto, old, modern, kconfig, makefile):
+def audit(proto, old, modern, kconfig, makefile, old_ipc_impl):
     problems = []
     for name, value in REQUIRED.items():
         if define_value(proto, name) != value:
             problems.append(f"prototype {name} differs from historical Exynos7885 value")
     for old_name, new_name in (
-        ("INTGR1", "EXYNOS7885_ACPM_INTGR1"),
+        ("INTGR0", "EXYNOS7885_ACPM_INTGR0"),
         ("INTMR0", "EXYNOS7885_ACPM_INTMR0"),
         ("INTMR1", "EXYNOS7885_ACPM_INTMR1"),
     ):
         if define_value(old, old_name) != REQUIRED[new_name]:
             problems.append(f"Historical mailbox {old_name} changed")
+    historical_send = (
+        r"static\s+void\s+apm_interrupt_gen\s*\(\s*unsigned\s+int\s+id\s*\)"
+        r"\s*\{[^}]*__raw_writel\s*\(\s*\(\s*1\s*<<\s*id\s*\)"
+        r"\s*<<\s*16\s*,\s*acpm_ipc->intr\s*\+\s*INTGR0\s*\)\s*;"
+    )
+    if not re.search(historical_send, old_ipc_impl, re.S):
+        problems.append("Historical AP->APM apm_interrupt_gen() source no longer matches INTGR0")
     # This variant must not accidentally be mistaken for the modern GS101 register map.
     if define_value(modern, "EXYNOS_MBOX_INTGR1") != 0x40:
         problems.append("Pinned GS101 INTGR1 unexpectedly changed")
@@ -53,8 +60,12 @@ def audit(proto, old, modern, kconfig, makefile):
         problems.append("Doorbell-type safety check missing")
     if "msg->chan_id >= EXYNOS7885_ACPM_MAX_CHANNELS" not in proto:
         problems.append("Mailbox channel range check missing")
-    if "EXYNOS7885_ACPM_INTGR1" not in proto.split("writel(")[1]:
-        problems.append("Send operation missing original INTGR1 offset")
+    correct_send = (
+        r"writel\s*\(\s*BIT\s*\(\s*msg->chan_id\s*\)\s*<<\s*16\s*,"
+        r"\s*mb->regs\s*\+\s*EXYNOS7885_ACPM_INTGR0\s*\)\s*;"
+    )
+    if not re.search(correct_send, proto):
+        problems.append("Send must write BIT(channel)<<16 to INTGR0=0x08")
     if "exynos7885-acpm-mbox-prototype" in kconfig + makefile:
         problems.append("Prototype accidentally integrated into Linux kernel build")
     if proto.count("writel(") != 1:
@@ -68,6 +79,7 @@ def audit(proto, old, modern, kconfig, makefile):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--old-header", required=True, type=Path)
+    ap.add_argument("--old-implementation", required=True, type=Path)
     ap.add_argument("--modern-mailbox", required=True, type=Path)
     ap.add_argument("--kernel-kconfig", required=True, type=Path)
     ap.add_argument("--kernel-makefile", required=True, type=Path)
@@ -76,12 +88,13 @@ def main():
         SOURCE.read_text(), args.old_header.read_text(),
         args.modern_mailbox.read_text(),
         args.kernel_kconfig.read_text(), args.kernel_makefile.read_text(),
+        args.old_implementation.read_text(),
     )
     for issue in result:
         print("FAIL:", issue)
     if result:
         raise SystemExit(1)
-    print("PASS: Exynos7885 0x1c/0x10 mailbox offsets and guarded AArch64 doorbell driver prototype")
+    print("PASS: historical AP->APM INTGR0=0x08 with BIT(channel)<<16 validated against Samsung source")
     print("BLOCKED: prototype unregistered/unbound, no Exynos7885 ACPM queue integration or real hardware test")
 
 
