@@ -101,7 +101,7 @@ jobs:
           llvm-ar t "$archive" | tee kbuild-evidence/archive-objects.txt
           # LLVM thin archives list members with the output-directory prefix.
           # Match the final basename rather than requiring a bare filename.
-          grep -Eq '(^|/)exynos7885-acpm-mbox-prototype\.o
+          grep -Eq '(^|/)exynos7885-acpm-mbox-prototype[.]o$' kbuild-evidence/archive-objects.txt
           sha256sum "$obj" "$archive" | tee kbuild-evidence/object-and-archive-sha256.txt
           echo 'PASS: real Kbuild archive includes A7 experimental AArch64 platform-driver object.' \
             | tee kbuild-evidence/build-result.txt
