@@ -46,13 +46,18 @@ jobs:
           set -euo pipefail
           url=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/acpm_ipc.c
           curl -fLsS --retry 3 "$url" -o "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          framework_url=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/fw_header/framework.h
+          curl -fLsS --retry 3 "$framework_url" -o "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'TYPE_QUEUE = 1' "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'TYPE_BUFFER,' "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'if (channel->type == TYPE_BUFFER)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq 'if (++channel->seq_num == 64)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq '(channel->seq_num & 0x3f) << ACPM_IPC_PROTOCOL_SEQ_NUM' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq '__raw_writel((1 << id) << 16, acpm_ipc->intr + INTGR0)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           grep -Fq 'acpm_ipc->initdata->ipc_ap_max' "$RUNNER_TEMP/pinned-acpm-ipc.c"
           echo 'PASS: legacy request sequence 1..63 and AP->APM INTGR0 high bits source pinned' \
             | tee mock-read-evidence/legacy-sequence-gate.txt
-          sha256sum "$RUNNER_TEMP/pinned-acpm-ipc.c" \
+          sha256sum "$RUNNER_TEMP/pinned-acpm-ipc.c" "$RUNNER_TEMP/pinned-acpm-framework.h" \
             > mock-read-evidence/old-ipc-source-sha256.txt
 
       - name: Install ARM64 Linux toolchain
