@@ -40,6 +40,16 @@ class MailboxKbuildStageTests(unittest.TestCase):
                 self.code.replace("samsung,exynos7885-acpm-mbox-prototype",
                                   "samsung,exynos-acpm-ipc"))
 
+    def test_wrong_direction_doorbell_rejected(self):
+        with self.assertRaises(ValueError):
+            stage_kbuild_text(BASE_KCONFIG, BASE_MAKEFILE,
+                              self.code.replace("mb->regs + EXYNOS7885_ACPM_INTGR0",
+                                                "mb->regs + EXYNOS7885_ACPM_INTGR1"))
+        with self.assertRaises(ValueError):
+            stage_kbuild_text(BASE_KCONFIG, BASE_MAKEFILE,
+                              self.code.replace("BIT(msg->chan_id) << 16",
+                                                "BIT(msg->chan_id)"))
+
     def test_unexpected_mmio_write_fails(self):
         with self.assertRaises(ValueError):
             stage_kbuild_text(BASE_KCONFIG, BASE_MAKEFILE,
