@@ -36,7 +36,7 @@ class ReadPlanSafetyTests(unittest.TestCase):
 
     def test_reject_unsafe_response_queue_mutation(self):
         self.assertTrue(audit(
-            self.source + "\\nmemmove(queue + 1, queue, 4);", self.header))
+            self.source + "\nmemmove(queue + 1, queue, 4);", self.header))
 
     def test_reject_wrong_doorbell(self):
         self.assertTrue(audit(self.source, self.header.replace(
