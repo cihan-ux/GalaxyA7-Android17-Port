@@ -9,7 +9,7 @@ The [staging script](../tools/stage_exynos7885_mailbox_kernel_integration.py) ad
 - An explicit test-only enable survives `olddefconfig` and resolves all Kconfig dependencies.
 - A real `make ARCH=arm64 LLVM=1 drivers/mailbox/built-in.a` contains `exynos7885-acpm-mbox-prototype.o` as an AArch64 object, rather than only compiling the file out-of-tree.
 - No DT board node matches the prototype's nonproduction compatible; the pinned original GS101 driver is unchanged.
-- Correct A7 doorbell offset `0x1C` and no unverified IRQ-mask register writes.
+- Correct A7 AP→APM doorbell `INTGR0=0x08` with `BIT(channel)<<16` (not the earlier wrong-direction `INTGR1=0x1C`), and no unverified IRQ-mask register writes. Source comparisons verify the original Samsung `apm_interrupt_gen()` implementation.
 
 This is **not** a fully linked `vmlinux` or a functional kernel/ROM. A7's monolithic historical ACPM firmware node, IRQ ownership, power clocks, memory/SRAM channel queues, the S2MPU08 regulators and their revision-specific safety mechanisms remain unresolved.
 
