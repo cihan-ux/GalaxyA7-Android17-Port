@@ -21,7 +21,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
-#define EXYNOS7885_ACPM_INTGR1 0x001c
+#define EXYNOS7885_ACPM_INTGR0 0x0008
+/* INTGR1=0x1c is not the AP->APM request register. */
 #define EXYNOS7885_ACPM_INTMR0 0x0010
 #define EXYNOS7885_ACPM_INTMR1 0x0024
 #define EXYNOS7885_ACPM_MAX_CHANNELS 16U
@@ -31,7 +32,9 @@ struct exynos7885_acpm_mbox {
 	struct mbox_controller controller;
 };
 
-/* Only send a doorbell bit; actual payload belongs to ACPM SRAM queues. */
+/* Samsung legacy apm_interrupt_gen(id) writes (1 << id) << 16 to INTGR0. 
+ * This is AP->APM; INTGR1 sends in the opposite direction.
+ * No live firmware/channel validation; this driver remains unbound. */
 static int exynos7885_acpm_send(struct mbox_chan *chan, void *data)
 {
 	struct exynos7885_acpm_mbox *mb =
@@ -42,7 +45,7 @@ static int exynos7885_acpm_send(struct mbox_chan *chan, void *data)
 	    msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL)
 		return -EINVAL;
 
-	writel(BIT(msg->chan_id), mb->regs + EXYNOS7885_ACPM_INTGR1);
+	writel(BIT(msg->chan_id) << 16, mb->regs + EXYNOS7885_ACPM_INTGR0);
 	return 0;
 }
 
