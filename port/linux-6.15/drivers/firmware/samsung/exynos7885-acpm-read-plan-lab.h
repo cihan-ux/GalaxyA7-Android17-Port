@@ -8,6 +8,9 @@
 #include "exynos7885-acpm-sram-abi-lab.h"
 #include "s2mpu08-a7-acpm-frame-lab.h"
 
+/* Pinned firmware enum shard_buffer_type: TYPE_QUEUE=1, TYPE_BUFFER=2. */
+#define A7_ACPM_QUEUE_TYPE 1U
+#define A7_ACPM_BUFFER_TYPE 2U
 #define A7_ACPM_READ_SEQUENCE_MIN 1U
 #define A7_ACPM_READ_SEQUENCE_MAX 63U
 #define A7_ACPM_READ_SEQUENCE_SHIFT 16U
