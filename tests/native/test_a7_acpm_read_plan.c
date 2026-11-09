@@ -157,7 +157,23 @@ static void test_mock_read_lifecycle(void)
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 20, &state) == -1);
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 0, &state) == -1);
 	assert(a7_acpm_begin_read_lifecycle(&request, 500, 60001, &state) == -1);
-	puts("PASS: mock ACPM read lifecycle timeout, wrap, late reply, error, retry and stale data");
+	/* Also cover high bitmap: sequence 63 times out and cannot be reused. */
+	request.sequence = 63;
+	request.request.word[0] = (63U << 16) | 0x14fU;
+	assert(a7_acpm_begin_read_lifecycle(&request, 700, 1, &state) == 0);
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, NULL, 0, 0, 0, 701) == 0);
+	assert(state.state == A7_ACPM_WAIT_EXPIRED);
+	assert(state.quarantined_sequence_high & (1U << 31));
+	assert(a7_acpm_begin_read_lifecycle(&request, 800, 10, &state) == -1);
+	/* Non-quarantined 32 remains usable while 7, 8 and 63 stay blocked. */
+	request.sequence = 32;
+	request.request.word[0] = (32U << 16) | 0x14fU;
+	assert(a7_acpm_begin_read_lifecycle(&request, 800, 10, &state) == 0);
+	assert(state.quarantined_sequence_low & (1U << 7));
+	assert(state.quarantined_sequence_low & (1U << 8));
+	assert(state.quarantined_sequence_high & (1U << 31));
+	puts("PASS: low/high six-bit sequence quarantine, timeout, wrap, late reply and firmware error");
 }
 
 int main(void)
