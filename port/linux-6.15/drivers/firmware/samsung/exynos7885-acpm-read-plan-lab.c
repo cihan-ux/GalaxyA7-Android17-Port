@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Offline read-only S2MPU08 request planner for pinned Samsung Exynos7885.
+ * No MMIO, mailbox API, raw memory pointers, firmware calls or device binding.
+ * Real IPC concurrency/timing/ownership and PMIC power control unimplemented.
+ */
+#include "exynos7885-acpm-read-plan-lab.h"
+
+_Static_assert(sizeof(unsigned int) == 4, "ACPM commands are 32-bit");
+_Static_assert(sizeof(struct s2mpu08_a7_acpm_frame) == 16,
+	       "PMIC read command uses four 32-bit words");
+
+/*
+ * The pinned historical ACPM IPC code puts 1..63 in bits 21:16, then
+ * advances the firmware AP TX front and sends (BIT(channel)<<16) to
+ * INTGR0=0x08. This function only computes those values in ordinary RAM.
+ */
+int a7_acpm_prepare_s2mpu08_read(
+	const struct a7_legacy_framework_prefix *framework,
+	const struct a7_legacy_ipc_channel *channel,
+	unsigned int transport_channel,
+	unsigned int pmic_type, unsigned int reg, unsigned int seq,
+	unsigned int front, unsigned int rear,
+	struct a7_acpm_read_plan *out)
+{
+	struct a7_acpm_queue_layout layout;
+	struct s2mpu08_a7_acpm_frame frame;
+	struct a7_acpm_read_plan plan;
+	unsigned int count, array_offset, next_front, slot_offset;
+
+	if (!framework || !channel || !out ||
+	    transport_channel != A7_ACPM_PMIC_CHANNEL ||
+	    seq < A7_ACPM_READ_SEQUENCE_MIN ||
+	    seq > A7_ACPM_READ_SEQUENCE_MAX ||
+	    a7_acpm_validate_fw_prefix(framework, A7_ACPM_SRAM_BYTES,
+					 &array_offset, &count) != 0 ||
+	    a7_acpm_validate_pmic_channel(channel, A7_ACPM_SRAM_BYTES,
+					   &layout) != 0 ||
+	    layout.mlen != sizeof(frame) || front >= layout.qlen ||
+	    rear >= layout.qlen)
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	/* A nonempty queue must not be overwritten when front+1 == rear. */
+	next_front = (front + 1U) % layout.qlen;
+	if (next_front == rear)
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	if (s2mpu08_a7_acpm_pack_read(transport_channel, pmic_type, reg,
+				     &frame) != 0 ||
+	    frame.word[0] & (63U << A7_ACPM_READ_SEQUENCE_SHIFT))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	/* The validated queue layout proves all qlen*mlen bytes are in SRAM. */
+	slot_offset = layout.ap_tx_base + front * layout.mlen;
+	if (slot_offset > A7_ACPM_SRAM_BYTES - sizeof(frame))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	frame.word[0] |= seq << A7_ACPM_READ_SEQUENCE_SHIFT;
+	plan.queue_entry_offset = slot_offset;
+	plan.next_front = next_front;
+	plan.channel_id = transport_channel;
+	plan.sequence = seq;
+	plan.doorbell_offset = A7_ACPM_DOORBELL_INTGR0_OFFSET;
+	plan.doorbell_value = (1U << channel->id) << 16;
+	plan.request = frame;
+	*out = plan; /* Failure has no partial caller-visible writes. */
+	return 0;
+}
