@@ -31,10 +31,13 @@ def audit(source, header):
         "seq << A7_ACPM_READ_SEQUENCE_SHIFT",
         "(1U << channel->id) << 16",
         "layout.mlen != sizeof(frame)",
+        "channel->type != A7_ACPM_QUEUE_TYPE",
         "next_front == rear",
     ):
         if needle not in code:
             failures.append("source-validated request guard missing: " + needle)
+    if not re.search(r"#define\s+A7_ACPM_QUEUE_TYPE\s+1U\b", code):
+        failures.append("Historical firmware TYPE_QUEUE=1 guard missing")
     if not re.search(r"#define\s+A7_ACPM_DOORBELL_INTGR0_OFFSET\s+0x0008U\b", code):
         failures.append("A7 doorbell must refer to historical INTGR0=0x08")
     return failures
