@@ -38,10 +38,17 @@ def audit(source, header):
         "decision.firmware_status = status",
         "decision.next_rear = (rear + 1U) % ring_count",
         "decision.requires_rear_swap = position != rear",
+        "a7_acpm_begin_read_lifecycle(",
+        "a7_acpm_advance_read_lifecycle(",
+        "elapsed = observed_ms - lifecycle->start_ms",
+        "elapsed >= lifecycle->timeout_ms",
+        "lifecycle->state = A7_ACPM_WAIT_EXPIRED",
+        "A7_ACPM_WAIT_FIRMWARE_ERR",
     ):
         if needle not in code:
             failures.append("source-validated request guard missing: " + needle)
-    if re.search(r'\b(?:memcpy|memmove|spin_lock|mutex_lock)\s*\(', code):
+    if re.search(r'\b(?:memcpy|memmove|spin_lock|mutex_lock|'
+               r'ktime_get|msleep|usleep_range|schedule_timeout)\s*\(', code):
         failures.append("offline response plan must not mutate queue or take runtime locks")
     if not re.search(r"#define\s+A7_ACPM_QUEUE_TYPE\s+1U\b", code):
         failures.append("Historical firmware TYPE_QUEUE=1 guard missing")

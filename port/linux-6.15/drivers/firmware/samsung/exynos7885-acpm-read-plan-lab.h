@@ -65,4 +65,51 @@ int a7_acpm_match_s2mpu08_read_reply(
 	unsigned int ring_count, unsigned int rear, unsigned int front,
 	struct a7_acpm_reply_decision *out);
 
+/*
+ * A synthetic request lifecycle with explicit caller-supplied time samples.
+ * No sleeping, clocks, IRQs, firmware transactions, SRAM access or locks.
+ * A time limit is a test policy, NOT a proven Samsung firmware timeout.
+ */
+#define A7_ACPM_WAIT_TIMEOUT_MAX_MS 60000U
+#define A7_ACPM_WAIT_PENDING       0U
+#define A7_ACPM_WAIT_SUCCESS       1U
+#define A7_ACPM_WAIT_FIRMWARE_ERR  2U
+#define A7_ACPM_WAIT_EXPIRED       3U
+#define A7_ACPM_WAIT_ALREADY_DONE  1
+
+struct a7_acpm_read_lifecycle {
+	unsigned int state;
+	unsigned int sequence;
+	unsigned int command_word0;
+	unsigned int start_ms;
+	unsigned int timeout_ms;
+	unsigned int firmware_status;
+	unsigned int response_value;
+};
+
+/*
+ * Zero-initialize before the first begin. A pending request cannot be
+ * replaced. A terminal request may be explicitly restarted by the caller.
+ */
+int a7_acpm_begin_read_lifecycle(
+	const struct a7_acpm_read_plan *request,
+	unsigned int start_ms, unsigned int timeout_ms,
+	struct a7_acpm_read_lifecycle *lifecycle);
+
+/*
+ * Advance from a synthetic RX snapshot at a caller-supplied u32 timestamp.
+ * Elapsed time is evaluated modulo 2^32, with a <=60s timeout budget.
+ * Input samples must be taken less than 2^31ms apart to avoid ambiguity.
+ * Once timed out or completed, a delayed/stale reply cannot change state.
+ *
+ * Return 0 for a valid update (including still pending);
+ * 1 for an already terminal state; -1 for invalid input.
+ */
+int a7_acpm_advance_read_lifecycle(
+	struct a7_acpm_read_lifecycle *lifecycle,
+	const struct a7_acpm_read_plan *request,
+	const struct s2mpu08_a7_acpm_frame *reply_ring,
+	unsigned int ring_count, unsigned int rear, unsigned int front,
+	unsigned int observed_ms);
+
 #endif

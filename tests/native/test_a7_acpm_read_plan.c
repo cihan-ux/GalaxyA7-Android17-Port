@@ -66,8 +66,91 @@ static void check_mock_reply_matching(void)
 	puts("PASS: simulated ACPM read replies match sequence/type/register; wrong, stale and error responses guarded");
 }
 
+static void test_mock_read_lifecycle(void)
+{
+	struct a7_acpm_read_plan request = {0};
+	struct a7_acpm_read_plan wrong;
+	struct a7_acpm_read_lifecycle state = {0}, before;
+	struct s2mpu08_a7_acpm_frame replies[4] = {{{0}}};
+
+	request.channel_id = 2;
+	request.sequence = 7;
+	request.request.word[0] = (7U << 16) | 0x14fU;
+	request.doorbell_offset = A7_ACPM_DOORBELL_INTGR0_OFFSET;
+	request.doorbell_value = 0x40000U;
+
+	/* Restarting an in-flight session must fail without altering state. */
+	assert(a7_acpm_begin_read_lifecycle(&request, 0xfffffff0U, 40, &state) == 0);
+	before = state;
+	assert(a7_acpm_begin_read_lifecycle(&request, 0xfffffff1U, 40, &state) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+
+	/* Not-yet-received response at t=5 is 21ms after wraparound. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 0, 5) == 0);
+	assert(state.state == A7_ACPM_WAIT_PENDING);
+	replies[0].word[0] = request.request.word[0];
+	replies[0].word[1] = (0x55U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT);
+
+	/* Exact timeout boundary wins even if a matching reply is visible. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 0x18U) == 0);
+	assert(state.state == A7_ACPM_WAIT_EXPIRED);
+	assert(state.response_value == 0);
+	before = state;
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 0x19U) ==
+		A7_ACPM_WAIT_ALREADY_DONE);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+
+	/* After deliberate restart a timely response can succeed. */
+	assert(a7_acpm_begin_read_lifecycle(&request, 100, 20, &state) == 0);
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 105) == 0);
+	assert(state.state == A7_ACPM_WAIT_SUCCESS);
+	assert(state.response_value == 0x55U && state.firmware_status == 0);
+
+	/* Firmware errors must not expose data as successful PMIC reads. */
+	assert(a7_acpm_begin_read_lifecycle(&request, 200, 20, &state) == 0);
+	replies[0].word[1] = (3U << A7_ACPM_READ_RESPONSE_STATUS_SHIFT) |
+			     (0x77U << A7_ACPM_READ_RESPONSE_VALUE_SHIFT);
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 201) == 0);
+	assert(state.state == A7_ACPM_WAIT_FIRMWARE_ERR);
+	assert(state.firmware_status == 3 && state.response_value == 0);
+
+	/* Stale sequence or wrong register must remain pending. */
+	assert(a7_acpm_begin_read_lifecycle(&request, 300, 20, &state) == 0);
+	replies[0].word[0] = (6U << 16) | 0x14fU;
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 301) == 0);
+	assert(state.state == A7_ACPM_WAIT_PENDING);
+	replies[0].word[0] = (7U << 16) | 0x100U;
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 302) == 0);
+	assert(state.state == A7_ACPM_WAIT_PENDING);
+
+	/* Wrong request identity and malformed snapshots fail closed. */
+	wrong = request;
+	wrong.request.word[0] ^= 1U;
+	before = state;
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &wrong, replies, 4, 0, 1, 303) == -1);
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, NULL, 4, 0, 1, 303) == -1);
+	assert(memcmp(&before, &state, sizeof(state)) == 0);
+	/* Excessive elapsed time must expire instead of accepting stale data. */
+	assert(a7_acpm_advance_read_lifecycle(
+		&state, &request, replies, 4, 0, 1, 321) == 0);
+	assert(state.state == A7_ACPM_WAIT_EXPIRED);
+	assert(a7_acpm_begin_read_lifecycle(&request, 500, 0, &state) == -1);
+	assert(a7_acpm_begin_read_lifecycle(&request, 500, 60001, &state) == -1);
+	puts("PASS: mock ACPM read lifecycle timeout, wrap, late reply, error, retry and stale data");
+}
+
 int main(void)
 {
+	test_mock_read_lifecycle();
 	check_mock_reply_matching();
 	struct a7_legacy_framework_prefix fw = {0};
 	struct a7_legacy_ipc_channel ch = {0};

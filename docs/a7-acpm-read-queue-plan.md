@@ -19,3 +19,20 @@ A second pure C routine, `a7_acpm_match_s2mpu08_read_reply`, examines a **synthe
 Firmware status is extracted from the high response byte. Failed firmware replies do not return a PMIC value. A missing reply leaves the output unchanged, allowing higher-level code to implement carefully bounded wait/timeout handling later. The tests include a wrapped ring with stale sequence and wrong register, a correct response, firmware error status, an empty queue, invalid indices and null pointers. Source pins in CI check the legacy `check_response()` behavior.
 
 The complete updated reply-matching source **passed [CI 42616562784](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42616562784)**: host C test cases, pinned Samsung old-source assertions and genuine Linux 6.15 AArch64 object compilation. This establishes **algorithm-level compatibility only**. No real firmware response was sampled; it does not validate the hardware queue, locking, synchronization, timeout or PMIC write correctness.
+
+
+## Offline request lifecycle and timeout policy
+
+A new **pure-C lifecycle model** records an outstanding read, its expected
+sequence and exact command, and a caller-supplied millisecond start time.
+It rejects replacing a still-pending request, reports a successful synthetic
+reply, latches a nonzero firmware error without returning the register value,
+or marks the read expired after a **test-configured** timeout (1–60,000 ms).
+Once terminal, a late matching reply **cannot** turn the operation into a
+success. Unsigned 32-bit sample subtraction is tested across wraparound;
+sample intervals beyond half the counter range are out of scope.
+
+This is **not** a runtime timeout implementation: there is no timer,
+interrupt controller, lock, queue ownership or scheduler. The maximum
+timeout is a deliberately chosen test constraint, **not a firmware
+specification**. All input timestamps and response frames are artificial.

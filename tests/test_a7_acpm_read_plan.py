@@ -38,6 +38,15 @@ class ReadPlanSafetyTests(unittest.TestCase):
         self.assertTrue(audit(
             self.source + "\nmemmove(queue + 1, queue, 4);", self.header))
 
+    def test_reject_removed_lifecycle_timeout(self):
+        self.assertTrue(audit(
+            self.source.replace("elapsed >= lifecycle->timeout_ms",
+                                "elapsed < lifecycle->timeout_ms"),
+            self.header))
+
+    def test_reject_real_sleep_or_clock_api(self):
+        self.assertTrue(audit(self.source + "\nmsleep(20);", self.header))
+
     def test_reject_wrong_doorbell(self):
         self.assertTrue(audit(self.source, self.header.replace(
             "A7_ACPM_DOORBELL_INTGR0_OFFSET 0x0008U",

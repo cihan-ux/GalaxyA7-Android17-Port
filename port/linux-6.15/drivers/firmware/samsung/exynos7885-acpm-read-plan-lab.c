@@ -123,3 +123,84 @@ int a7_acpm_match_s2mpu08_read_reply(
 	/* Missing matching response, including an empty synthetic queue. */
 	return A7_ACPM_REPLY_NOT_FOUND;
 }
+
+/*
+ * Pure-memory lifecycle model for request/reply and a synthetic monotonic
+ * unsigned 32-bit millisecond clock. No actual firmware timing is asserted.
+ */
+int a7_acpm_begin_read_lifecycle(
+	const struct a7_acpm_read_plan *request,
+	unsigned int start_ms, unsigned int timeout_ms,
+	struct a7_acpm_read_lifecycle *lifecycle)
+{
+	struct a7_acpm_read_lifecycle next;
+	unsigned int seq_mask = 0x3fU << A7_ACPM_READ_SEQUENCE_SHIFT;
+
+	if (!request || !lifecycle || !timeout_ms ||
+	    timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS ||
+	    request->channel_id != A7_ACPM_PMIC_CHANNEL ||
+	    request->sequence < A7_ACPM_READ_SEQUENCE_MIN ||
+	    request->sequence > A7_ACPM_READ_SEQUENCE_MAX ||
+	    request->doorbell_offset != A7_ACPM_DOORBELL_INTGR0_OFFSET ||
+	    request->doorbell_value != (1U << A7_ACPM_PMIC_CHANNEL) << 16 ||
+	    ((request->request.word[0] & seq_mask) >>
+	     A7_ACPM_READ_SEQUENCE_SHIFT) != request->sequence ||
+	    (lifecycle->state == A7_ACPM_WAIT_PENDING &&
+	     lifecycle->timeout_ms))
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	next.state = A7_ACPM_WAIT_PENDING;
+	next.sequence = request->sequence;
+	next.command_word0 = request->request.word[0];
+	next.start_ms = start_ms;
+	next.timeout_ms = timeout_ms;
+	next.firmware_status = 0;
+	next.response_value = 0;
+	*lifecycle = next;
+	return 0;
+}
+
+int a7_acpm_advance_read_lifecycle(
+	struct a7_acpm_read_lifecycle *lifecycle,
+	const struct a7_acpm_read_plan *request,
+	const struct s2mpu08_a7_acpm_frame *reply_ring,
+	unsigned int ring_count, unsigned int rear, unsigned int front,
+	unsigned int observed_ms)
+{
+	struct a7_acpm_reply_decision matched;
+	unsigned int elapsed;
+	int result;
+
+	if (!lifecycle || !request || !lifecycle->timeout_ms ||
+	    lifecycle->timeout_ms > A7_ACPM_WAIT_TIMEOUT_MAX_MS ||
+	    lifecycle->sequence != request->sequence ||
+	    lifecycle->command_word0 != request->request.word[0] ||
+	    request->channel_id != A7_ACPM_PMIC_CHANNEL)
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	if (lifecycle->state != A7_ACPM_WAIT_PENDING)
+		return A7_ACPM_WAIT_ALREADY_DONE;
+
+	/* Modulo arithmetic also handles a wrapped 32-bit fake clock. */
+	elapsed = observed_ms - lifecycle->start_ms;
+	if (elapsed >= lifecycle->timeout_ms) {
+		lifecycle->state = A7_ACPM_WAIT_EXPIRED;
+		lifecycle->firmware_status = 0;
+		lifecycle->response_value = 0;
+		return 0;
+	}
+
+	result = a7_acpm_match_s2mpu08_read_reply(
+		request, reply_ring, ring_count, rear, front, &matched);
+	if (result == A7_ACPM_REPLY_NOT_FOUND)
+		return 0;
+	if (result != 0)
+		return A7_ACPM_READ_PLAN_ERROR;
+
+	lifecycle->firmware_status = matched.firmware_status;
+	lifecycle->response_value = matched.firmware_status ?
+		0 : matched.response_value;
+	lifecycle->state = matched.firmware_status ?
+		A7_ACPM_WAIT_FIRMWARE_ERR : A7_ACPM_WAIT_SUCCESS;
+	return 0;
+}
