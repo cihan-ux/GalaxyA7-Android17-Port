@@ -1,0 +1,56 @@
+name: A7 ACPM read-only descriptor snapshots (HOST + freestanding ARM64, NO IO)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-descriptor-snapshot.yml'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-descriptor-snapshot-lab.*'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.*'
+      - 'tools/check_a7_acpm_descriptor_snapshot.py'
+      - 'tests/test_a7_acpm_descriptor_snapshot.py'
+      - 'tests/native/test_a7_acpm_descriptor_snapshot.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-read-only-snapshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout source without credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Reject IO and run source mutation tests
+        run: |
+          set -euo pipefail
+          python3 tools/check_a7_acpm_descriptor_snapshot.py
+          python3 -m unittest discover -s tests -p 'test_a7_acpm_descriptor_snapshot.py' -v
+      - name: Build and execute bounded two-view SRAM snapshot C tests
+        run: |
+          set -euo pipefail
+          dir=port/linux-6.15/drivers/firmware/samsung
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -I"$dir" \
+            "$dir/exynos7885-acpm-descriptor-snapshot-lab.c" \
+            "$dir/exynos7885-acpm-sram-abi-lab.c" \
+            tests/native/test_a7_acpm_descriptor_snapshot.c \
+            -o "$RUNNER_TEMP/a7-acpm-descriptor-test"
+          "$RUNNER_TEMP/a7-acpm-descriptor-test"
+      - name: Cross-compile read-only objects for freestanding AArch64
+        run: |
+          set -euo pipefail
+          dir=port/linux-6.15/drivers/firmware/samsung
+          for source in exynos7885-acpm-descriptor-snapshot-lab exynos7885-acpm-sram-abi-lab; do
+            clang --target=aarch64-none-elf -std=c11 -ffreestanding -fno-builtin \
+              -Wall -Wextra -Werror -c "$dir/$source.c" -o "$RUNNER_TEMP/$source.o"
+            readelf -h "$RUNNER_TEMP/$source.o" | grep -q 'Machine:.*AArch64'
+          done
+          echo 'PASS: two freestanding ARM64 objects; NOT Linux Kbuild or on-device firmware access'
+      - name: Document strict limits
+        if: always()
+        run: |
+          {
+            echo '## A7 read-only SRAM descriptor snapshot test'
+            echo 'Only independent caller-owned RAM images. No live firmware SRAM mapping, IRQ, writes, probe, regulator or boot.'
+            echo 'AArch64 freestanding objects are NOT a Linux 6.15 kernel image or Kbuild integration.'
+          } >> "$GITHUB_STEP_SUMMARY"
