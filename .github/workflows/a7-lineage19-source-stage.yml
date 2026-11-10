@@ -1,0 +1,44 @@
+name: A7 LineageOS 19.1 source-stage validation (NO ROM)
+'on':
+  push:
+    branches: [dev/lineage-19.1-a7y18lte]
+    paths:
+      - '.github/workflows/a7-lineage19-source-stage.yml'
+      - 'port/lineage-19.1/**'
+      - 'manifests/lineage-19.1-a7y18lte-local.xml'
+      - 'tools/check_lineage19_port.py'
+      - 'tests/test_lineage19_port.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-source-delta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout unmerged Android 12L research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check local manifest, 12L product inheritance and regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/check_lineage19_port.py
+          python3 -m unittest discover -s tests -p test_lineage19_port.py -v
+      - name: Check immutable upstream Android 12L and 18.1 source facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/a7-lineage19"
+          base="https://raw.githubusercontent.com"
+          curl -fLsS --retry 3 "$base/LineageOS/android/74f3868c0a4e774a8626ba329bc93eb4862e5b48/default.xml" -o "$RUNNER_TEMP/a7-lineage19/default.xml"
+          grep -Fq 'android-12.1.0_r22' "$RUNNER_TEMP/a7-lineage19/default.xml"
+          grep -Fq 'refs/heads/lineage-19.1' "$RUNNER_TEMP/a7-lineage19/default.xml"
+          curl -fLsS --retry 3 "$base/LineageOS/android_build/ec4184bcd771e59d3d108115507587444697be38/target/product/product_launched_with_o.mk" -o "$RUNNER_TEMP/a7-lineage19/product_launched_with_o.mk"
+          grep -Fq 'PRODUCT_SHIPPING_API_LEVEL := 26' "$RUNNER_TEMP/a7-lineage19/product_launched_with_o.mk"
+          curl -fLsS --retry 3 "$base/exynos7885-dev/device_samsung_a7y18lte/f17643ba01010c45b628d5acb8f48350ded61606/lineage_a7y18lte.mk" -o "$RUNNER_TEMP/a7-lineage19/legacy_product.mk"
+          grep -Fq 'PRODUCT_SHIPPING_API_LEVEL := 28' "$RUNNER_TEMP/a7-lineage19/legacy_product.mk"
+          grep -Fq '$(call inherit-product, device/samsung/a7y18lte/device.mk)' "$RUNNER_TEMP/a7-lineage19/legacy_product.mk"
+          sha256sum "$RUNNER_TEMP"/a7-lineage19/* > "$RUNNER_TEMP/a7-lineage19-sha256.txt"
+          echo 'PASS: pinned source facts, not a complete Android 12L build'
