@@ -50,6 +50,20 @@ are reviewed, attempt `source build/envsetup.sh`,
 `lunch lineage_a7y18lte-userdebug` and a **configuration-only**
 test. A successful lunch is not a kernel/ROM build.
 
+## Verified framework compatibility advantage over Android 17
+
+The inspected [LineageOS 19.1 hardware interfaces snapshot](https://github.com/LineageOS/android_hardware_interfaces/blob/ae469cee0dce6d71489588126a15da8e67a50102/compatibility_matrices/Android.bp)
+declares `framework_compatibility_matrix.3.xml` with
+`kernel_config_p_4.4`. Both pinned A7 device and common VINTF manifests
+declare `target-level="3"`, and the historical kernel is Linux 4.4.302.
+
+**This removes the specific *source-level* absence of FCM 3 / Linux 4.4
+seen in our Android 17 target**, making Android 12L a materially more
+promising starting point. It does **not** mean that the framework and vendor
+manifest requirements match, nor that binder, SELinux, boot or proprietary
+HALs are compatible. A complete `checkvintf` against real build outputs
+is still mandatory.
+
 ## Design decisions and blockers
 
 1. 19.1 uses the old `PRODUCT-VARIANT` lunch choice, not the Android

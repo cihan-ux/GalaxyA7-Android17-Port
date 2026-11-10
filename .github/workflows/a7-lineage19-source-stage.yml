@@ -41,4 +41,18 @@ jobs:
           grep -Fq 'PRODUCT_SHIPPING_API_LEVEL := 28' "$RUNNER_TEMP/a7-lineage19/legacy_product.mk"
           grep -Fq '$(call inherit-product, device/samsung/a7y18lte/device.mk)' "$RUNNER_TEMP/a7-lineage19/legacy_product.mk"
           sha256sum "$RUNNER_TEMP"/a7-lineage19/* > "$RUNNER_TEMP/a7-lineage19-sha256.txt"
-          echo 'PASS: pinned source facts, not a complete Android 12L build'
+          curl -fLsS --retry 3 "$base/LineageOS/android_hardware_interfaces/ae469cee0dce6d71489588126a15da8e67a50102/compatibility_matrices/Android.bp" -o "$RUNNER_TEMP/a7-lineage19/framework_matrices.bp"
+          python3 - "$RUNNER_TEMP/a7-lineage19/framework_matrices.bp" <<'PY'
+          import re
+          import sys
+          text = open(sys.argv[1], encoding="utf-8").read()
+          block = re.search(
+              r'vintf_compatibility_matrix\\s*\\{\\s*name:\\s*"framework_compatibility_matrix\\.3\\.xml"(.*?)\\n\\}',
+              text, re.S)
+          assert block, "LineageOS 19.1 FCM 3 module missing"
+          assert '"kernel_config_p_4.4"' in block.group(1), "Linux 4.4 omitted from FCM 3"
+          print("PASS: target 19.1 actually retains FCM 3 with Linux 4.4")
+          PY
+          curl -fLsS --retry 3 "$base/exynos7885-dev/device_samsung_exynos7885-common/f2ce8d2093711026f021cba7036334d381d455ef/manifest.xml" -o "$RUNNER_TEMP/a7-lineage19/legacy_common_manifest.xml"
+          grep -Fq 'target-level="3"' "$RUNNER_TEMP/a7-lineage19/legacy_common_manifest.xml"
+                    echo 'PASS: pinned source facts, not a complete Android 12L build'
