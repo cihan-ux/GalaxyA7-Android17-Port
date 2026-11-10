@@ -42,3 +42,6 @@ This tracker separates actual compiler evidence, source checks and hardware func
 3. Freeze all target platform sources, then run genuine assembled SELinux, VINTF, BPF feature and native/HAL checks instead of interpreting isolated unit tests as Android 17 readiness.
 
 Do not publish proprietary firmware, EFS or personal partition images in this repository.
+
+
+| G7t: Mailbox prototype fixed-channel binding guard | PENDING CI (default OFF, no device) | The unbound Exynos7885 mailbox prototype now requires a one-cell DT channel ID and checks that the message ID corresponds to the actual allocated mailbox channel before any AP→APM doorbell. Prevents arbitrary free-channel assignment or cross-channel send in prototype; **no DTS binding, no firmware I/O, no runtime test**. |

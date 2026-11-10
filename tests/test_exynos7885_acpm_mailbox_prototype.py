@@ -36,6 +36,20 @@ class MailboxPrototypeTests(unittest.TestCase):
                             "BIT(msg->chan_id)"), OLD, NEW, "", "", OLD_IMPL))
         self.assertTrue(audit(self.c, OLD, NEW, "", "", OLD_IMPL.replace("INTGR0", "INTGR1")))
 
+    def test_reject_arbitrary_mailbox_channel_selection(self):
+        self.assertTrue(audit(
+            self.c.replace("args->args_count != 1", "args->args_count != 0"),
+            OLD, NEW, "", "", OLD_IMPL))
+        self.assertTrue(audit(
+            self.c.replace("return &mbox->chans[id]", "return &mbox->chans[0]"),
+            OLD, NEW, "", "", OLD_IMPL))
+
+    def test_reject_send_with_mismatched_mailbox_channel(self):
+        self.assertTrue(audit(
+            self.c.replace("chan != &chan->mbox->chans[msg->chan_id]",
+                           "chan == &chan->mbox->chans[msg->chan_id]"),
+            OLD, NEW, "", "", OLD_IMPL))
+
     def test_reject_wrong_old_offset(self):
         self.assertTrue(audit(self.c, OLD.replace("0x0008", "0x0040"), NEW, "", "", OLD_IMPL))
 

@@ -42,7 +42,8 @@ static int exynos7885_acpm_send(struct mbox_chan *chan, void *data)
 	const struct exynos_mbox_msg *msg = data;
 
 	if (!mb || !msg || msg->chan_id >= EXYNOS7885_ACPM_MAX_CHANNELS ||
-	    msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL)
+	    msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL ||
+	    chan != &chan->mbox->chans[msg->chan_id])
 		return -EINVAL;
 
 	writel(BIT(msg->chan_id) << 16, mb->regs + EXYNOS7885_ACPM_INTGR0);
@@ -57,16 +58,20 @@ static struct mbox_chan *
 exynos7885_acpm_of_xlate(struct mbox_controller *mbox,
 			 const struct of_phandle_args *args)
 {
-	unsigned int i;
+	unsigned int id;
 
-	if (args->args_count != 0)
+	/*
+	 * The prototype requires an explicit one-cell firmware channel ID.
+	 * Never hand out an arbitrary free channel: send_data() must match
+	 * the same ID before writing the AP->APM doorbell.
+	 * No production DT binding exists for this prototype.
+	 */
+	if (args->args_count != 1)
 		return ERR_PTR(-EINVAL);
-
-	for (i = 0; i < mbox->num_chans; i++) {
-		if (!mbox->chans[i].cl)
-			return &mbox->chans[i];
-	}
-	return ERR_PTR(-EBUSY);
+	id = args->args[0];
+	if (id >= EXYNOS7885_ACPM_MAX_CHANNELS)
+		return ERR_PTR(-EINVAL);
+	return &mbox->chans[id];
 }
 
 /*

@@ -58,6 +58,12 @@ def audit(proto, old, modern, kconfig, makefile, old_ipc_impl):
         problems.append("Old A7 tree has no named pclk; optional clock path missing")
     if "msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL" not in proto:
         problems.append("Doorbell-type safety check missing")
+    if "chan != &chan->mbox->chans[msg->chan_id]" not in proto:
+        problems.append("Doorbell send channel identity must match allocated channel")
+    if "args->args_count != 1" not in proto or "id = args->args[0]" not in proto or \
+       "return &mbox->chans[id]" not in proto or \
+       "id >= EXYNOS7885_ACPM_MAX_CHANNELS" not in proto:
+        problems.append("Mailbox xlate must select explicit bounded channel ID")
     if "msg->chan_id >= EXYNOS7885_ACPM_MAX_CHANNELS" not in proto:
         problems.append("Mailbox channel range check missing")
     correct_send = (
