@@ -47,7 +47,7 @@ jobs:
           import sys
           text = open(sys.argv[1], encoding="utf-8").read()
           block = re.search(
-              r'vintf_compatibility_matrix\\s*\\{\\s*name:\\s*"framework_compatibility_matrix\\.3\\.xml"(.*?)\\n\\}',
+              r'vintf_compatibility_matrix\s*\{\s*name:\s*"framework_compatibility_matrix\.3\.xml"(.*?)\n\}',
               text, re.S)
           assert block, "LineageOS 19.1 FCM 3 module missing"
           assert '"kernel_config_p_4.4"' in block.group(1), "Linux 4.4 omitted from FCM 3"
