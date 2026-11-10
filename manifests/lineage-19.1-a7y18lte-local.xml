@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LOCAL MANIFEST for LineageOS 19.1 on Galaxy A7 2018 (SM-A750F).
+  Install at .repo/local_manifests/a7y18lte.xml only after:
+    repo init -u https://github.com/LineageOS/android.git -b lineage-19.1
+  Pinned LineageOS 18.1 device/kernel/vendor SOURCES are a starting
+  point, NOT proof that they build or run against the 19.1 platform.
+  Does not reproduce the maintainer's released ZIP. No blobs shipped here.
+-->
+<manifest>
+  <remote name="a7-source" fetch="https://github.com/exynos7885-dev/" />
+  <remote name="a7-lineage" fetch="https://github.com/LineageOS/" />
+  <project name="device_samsung_a7y18lte" path="device/samsung/a7y18lte" remote="a7-source" revision="f17643ba01010c45b628d5acb8f48350ded61606" />
+  <project name="device_samsung_exynos7885-common" path="device/samsung/exynos7885-common" remote="a7-source" revision="f2ce8d2093711026f021cba7036334d381d455ef" />
+  <project name="kernel_samsung_exynos7885" path="kernel/samsung/exynos7885" remote="a7-source" revision="6020dfa8315134187f07ca903c9d2ed7ee0256f5" />
+  <project name="hardware_samsung" path="hardware/samsung" remote="a7-source" revision="082709ec235fd60f55bff0fb0deb8eae12bf0622" />
+  <project name="hardware_samsung_slsi-linaro_config" path="hardware/samsung_slsi-linaro/config" remote="a7-source" revision="c7a3ba8a1d8e9a467284f8e4e36672b33494e5f8" />
+  <project name="hardware_samsung_slsi-linaro_exynos" path="hardware/samsung_slsi-linaro/exynos" remote="a7-source" revision="f05f00d0280b5e84678a444a195ff6ccdb95d813" />
+  <project name="hardware_samsung_slsi-linaro_exynos5" path="hardware/samsung_slsi-linaro/exynos5" remote="a7-source" revision="6dff1105f24bb5a7d96806f9c61265658e836e25" />
+  <project name="hardware_samsung_slsi-linaro_graphics" path="hardware/samsung_slsi-linaro/graphics" remote="a7-source" revision="7c28107c046cd666b01adef06617482e26311ab7" />
+  <project name="hardware_samsung_slsi-linaro_openmax" path="hardware/samsung_slsi-linaro/openmax" remote="a7-source" revision="bf76218765ae6b3636acf0d898bdc81c1a912968" />
+  <project name="android_device_lineage_sepolicy" path="device/lineage/sepolicy" remote="a7-lineage" revision="0ece4d9fd0fc05129d8120d26083edd6ad106ec7" />
+  <project name="android_device_samsung_slsi_sepolicy" path="device/samsung_slsi/sepolicy" remote="a7-lineage" revision="b86bdaaa5aef70c51d28bc882b9867c3e88dd57d" />
+  <!-- Legacy vendor repositories are references to PUBLIC third-party code.
+       License, SM-A750F firmware revision and HAL compatibility are NOT
+       verified; no proprietary blobs are copied into this repo. -->
+  <project name="proprietary_vendor_samsung_a7y18lte" path="vendor/samsung/a7y18lte" remote="a7-source" revision="5e79a4f2536f755a1356636794df4b1bf0cfe780" />
+  <project name="proprietary_vendor_samsung_exynos7885-common" path="vendor/samsung/exynos7885-common" remote="a7-source" revision="51a9202e8b6d5e4852fdfbb31e5cd1e6769599af" />
+</manifest>
