@@ -32,6 +32,7 @@ def audit(source, header):
         "(1U << channel->id) << 16",
         "layout.mlen != sizeof(frame)",
         "channel->type != A7_ACPM_QUEUE_TYPE",
+        "channel->id != transport_channel",
         "next_front == rear",
         "a7_acpm_match_s2mpu08_read_reply(",
         "(word & 0xffffU) == (request->request.word[0] & 0xffffU)",

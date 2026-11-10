@@ -22,6 +22,12 @@ class ReadPlanSafetyTests(unittest.TestCase):
     def test_reject_irq_mask_mmio(self):
         self.assertTrue(audit(self.source + "\nwritel(BIT(2), regs);", self.header))
 
+    def test_reject_wrong_transport_descriptor_id(self):
+        self.assertTrue(audit(
+            self.source.replace("channel->id != transport_channel",
+                                "channel->id == transport_channel"),
+            self.header))
+
     def test_reject_accepting_buffer_as_queue(self):
         self.assertTrue(audit(
             self.source.replace("channel->type != A7_ACPM_QUEUE_TYPE",

@@ -141,3 +141,15 @@ register), as well as the separate six-bit request sequence.
 A negative native test for a forged nonzero wire channel and a
 source-audit regression enforce this behavior. This remains a
 synthetic frame check; it does not prove firmware or hardware behavior.
+
+
+### Transport descriptor ID parity
+
+The offline planner now requires the historical firmware channel
+descriptor's `id` to equal the requested **ACPM transport channel 2**.
+Previously it checked the transport argument but computed the outgoing
+doorbell using the descriptor ID; a mismatched synthetic descriptor could
+therefore plan a doorbell for another channel. A negative C test with
+descriptor ID 3 and a Python mutation regression now reject this case
+without changing the output. This is source-level validation only and
+does not establish a real firmware channel binding.

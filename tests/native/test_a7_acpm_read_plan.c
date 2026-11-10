@@ -494,6 +494,15 @@ int main(void)
 		       NULL, &ch, 2, 0, 0, 1, 0, 0, &plan) == -1);
 	assert(a7_acpm_prepare_s2mpu08_read(
 		       &fw, &ch, 2, 0, 0, 1, 0, 0, NULL) == -1);
+	/*
+	 * Descriptor ID and requested transport ID must agree: otherwise
+	 * the plan could ring the wrong firmware channel's doorbell.
+	 */
+	ch.id = 3;
+	assert(a7_acpm_prepare_s2mpu08_read(
+		       &fw, &ch, 2, 0, 0, 1, 0, 0, &plan) == -1);
+	assert(memcmp(&previous, &plan, sizeof(plan)) == 0);
+	ch.id = 2;
 	ch.ch.q_elem_size = 20;
 	assert(a7_acpm_prepare_s2mpu08_read(
 		       &fw, &ch, 2, 0, 0, 1, 0, 0, &plan) == -1);
