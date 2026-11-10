@@ -50,6 +50,16 @@ class MailboxPrototypeTests(unittest.TestCase):
                            "chan == &chan->mbox->chans[msg->chan_id]"),
             OLD, NEW, "", "", OLD_IMPL))
 
+    def test_reject_unverified_non_pmic_transport_channel(self):
+        self.assertTrue(audit(
+            self.c.replace("id != EXYNOS7885_ACPM_PMIC_CHANNEL",
+                           "id == EXYNOS7885_ACPM_PMIC_CHANNEL"),
+            OLD, NEW, "", "", OLD_IMPL))
+        self.assertTrue(audit(
+            self.c.replace("msg->chan_id != EXYNOS7885_ACPM_PMIC_CHANNEL",
+                           "msg->chan_id == EXYNOS7885_ACPM_PMIC_CHANNEL"),
+            OLD, NEW, "", "", OLD_IMPL))
+
     def test_reject_wrong_old_offset(self):
         self.assertTrue(audit(self.c, OLD.replace("0x0008", "0x0040"), NEW, "", "", OLD_IMPL))
 

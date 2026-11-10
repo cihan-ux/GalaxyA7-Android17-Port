@@ -14,6 +14,7 @@ REQUIRED = {
     "EXYNOS7885_ACPM_INTMR0": 0x10,
     "EXYNOS7885_ACPM_INTMR1": 0x24,
     "EXYNOS7885_ACPM_MAX_CHANNELS": 16,
+    "EXYNOS7885_ACPM_PMIC_CHANNEL": 2,
 }
 
 
@@ -58,6 +59,9 @@ def audit(proto, old, modern, kconfig, makefile, old_ipc_impl):
         problems.append("Old A7 tree has no named pclk; optional clock path missing")
     if "msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL" not in proto:
         problems.append("Doorbell-type safety check missing")
+    if "msg->chan_id != EXYNOS7885_ACPM_PMIC_CHANNEL" not in proto or \
+       "id != EXYNOS7885_ACPM_PMIC_CHANNEL" not in proto:
+        problems.append("Only source-confirmed ACPM PMIC transport channel 2 may be exposed")
     if "chan != &chan->mbox->chans[msg->chan_id]" not in proto:
         problems.append("Doorbell send channel identity must match allocated channel")
     if "args->args_count != 1" not in proto or "id = args->args[0]" not in proto or \

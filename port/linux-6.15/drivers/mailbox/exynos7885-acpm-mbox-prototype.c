@@ -26,6 +26,7 @@
 #define EXYNOS7885_ACPM_INTMR0 0x0010
 #define EXYNOS7885_ACPM_INTMR1 0x0024
 #define EXYNOS7885_ACPM_MAX_CHANNELS 16U
+#define EXYNOS7885_ACPM_PMIC_CHANNEL 2U
 
 struct exynos7885_acpm_mbox {
 	void __iomem *regs;
@@ -43,6 +44,7 @@ static int exynos7885_acpm_send(struct mbox_chan *chan, void *data)
 
 	if (!mb || !msg || msg->chan_id >= EXYNOS7885_ACPM_MAX_CHANNELS ||
 	    msg->chan_type != EXYNOS_MBOX_CHAN_TYPE_DOORBELL ||
+	    msg->chan_id != EXYNOS7885_ACPM_PMIC_CHANNEL ||
 	    chan != &chan->mbox->chans[msg->chan_id])
 		return -EINVAL;
 
@@ -64,12 +66,15 @@ exynos7885_acpm_of_xlate(struct mbox_controller *mbox,
 	 * The prototype requires an explicit one-cell firmware channel ID.
 	 * Never hand out an arbitrary free channel: send_data() must match
 	 * the same ID before writing the AP->APM doorbell.
+	 * Only the source-confirmed S2MPU08 transport channel 2 is in
+	 * scope; other firmware channels require independent research.
 	 * No production DT binding exists for this prototype.
 	 */
 	if (args->args_count != 1)
 		return ERR_PTR(-EINVAL);
 	id = args->args[0];
-	if (id >= EXYNOS7885_ACPM_MAX_CHANNELS)
+	if (id != EXYNOS7885_ACPM_PMIC_CHANNEL ||
+	    id >= EXYNOS7885_ACPM_MAX_CHANNELS)
 		return ERR_PTR(-EINVAL);
 	return &mbox->chans[id];
 }
