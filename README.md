@@ -36,6 +36,8 @@ New [offline ACPM read lifecycle and sequence-allocation research](docs/a7-acpm-
 
 A7 historical firmware initdata is **0x4B80** whereas GS101 code assumes **0xA000**; old and modern memory layout alignment alone does **not** establish full firmware or physical mailbox compatibility. **No working A7 ACPM transport, S2MPU08 voltage control or Android 17 boot exists yet.**
 
+An [A7 double-view firmware descriptor snapshot](docs/a7-acpm-descriptor-snapshot.md) now decodes a synthetic 0x1b000-byte firmware image, validates channel 2 and four ring indices, and rejects inconsistent RAM copies. [CI 42796229160](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42796229160) passed host C and freestanding ARM64 checks. **No live SRAM mapping or actual ACPM transaction was performed.**
+
 The user reports that the [2026-11-08 LineageOS 18.1 Android 11 release](docs/working-lineage18-20261108-reference.md) boots successfully on SM-A750F. Both the source-traced USB DWC3 resume fix and encrypted-data first-boot TEE SELinux fix are documented; no phone was accessed through this repository.
 
 The [pinned Galaxy A7 4.4.302 DTS revision inventory](docs/a7y18lte-legacy-dts-port-inventory.md) identifies distinct board rev00/rev01/rev03 source, GPIO, touch and fingerprint variants. Do not reuse A8-specific memory/pins, copy legacy `androidboot.selinux=permissive` bootargs or claim a successful DTB is an Android 17 ROM.
