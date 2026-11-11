@@ -29,6 +29,12 @@ class DescriptorSnapshotSafetyTests(unittest.TestCase):
     def test_reject_unchecked_queue_index(self):
         self.assertTrue(audit(self.source.replace("first != second || first >= qlen", "first > qlen"), self.header))
 
+    def test_reject_missing_region_nonoverlap_check(self):
+        altered = self.source.replace("a7_regions_disjoint(regions,",
+                                      "allow_overlapping_regions(regions,")
+        self.assertNotEqual(altered, self.source)
+        self.assertTrue(audit(altered, self.header))
+
     def test_reject_bypassing_prefix_bounds(self):
         self.assertTrue(audit(self.source.replace("a7_acpm_validate_fw_prefix(", "unsafe_prefix("), self.header))
 
