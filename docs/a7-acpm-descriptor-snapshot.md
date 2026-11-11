@@ -14,6 +14,14 @@ four indirect queue indices, checks each is below `qlen`, and refuses a
 result if either observation differs in the prefix, descriptor or indices.
 Outputs are not modified on error.
 
+The decoder now also rejects **otherwise in-bounds but overlapping** SRAM
+regions: the firmware prefix, full channel-descriptor array, both queue
+payload buffers, and all four indirect queue-index words must occupy distinct
+non-overlapping ranges. Native C tests intentionally construct aliasing ring
+buffers, duplicate indices, descriptors overlaid by queues, and a descriptor
+array overlapping the firmware prefix. This is a defensive offline ownership
+check, **not** evidence of the actual firmware's memory map.
+
 This is **not** an atomic hardware snapshot: the caller must acquire the
 two stable RAM copies using a separately designed synchronization mechanism.
 A real device still requires a proven Exynos7885 SRAM/DT ownership model,
