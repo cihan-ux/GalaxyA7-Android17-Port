@@ -1,0 +1,141 @@
+name: Galaxy A7 experimental Linux 6.15 ARM64 Image and Android drivers (NOT FLASHABLE)
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/exynos7885-615-a7-kernel-image-probe.yml'
+      - 'port/linux-6.15/config/**'
+      - 'tools/check_exynos7885_linux615_android_config.py'
+      - 'tests/test_exynos7885_linux615_android_config.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-modern-research-kernel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Verify exact-reviewed Android 17 config research fragment
+        run: python3 -m unittest discover -s tests -p test_exynos7885_linux615_android_config.py -v
+
+      - name: Install Clang/LLVM ARM64 kernel prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd device-tree-compiler
+
+      - name: Fetch immutable Linux 6.15-rc1 Exynos7885 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          grep -qx 'VERSION = 6' kernel/Makefile
+          grep -qx 'PATCHLEVEL = 15' kernel/Makefile
+          grep -qx 'EXTRAVERSION = -rc1' kernel/Makefile
+          test -s kernel/drivers/mmc/host/dw_mmc-exynos.c
+          test -s kernel/drivers/clk/samsung/clk-exynos7885.c
+          test -s kernel/drivers/android/binder.c
+
+      - name: Fetch exact Android 17 Connectivity loader for version gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=https://raw.githubusercontent.com/LineageOS/android_packages_modules_Connectivity/7c04d866538e6f689823b769fb5c1e614ca0e295
+          curl --fail --location --silent --show-error --retry 3 "$base/bpf/loader/NetBpfLoad.cpp" -o "$RUNNER_TEMP/NetBpfLoad.cpp"
+          curl --fail --location --silent --show-error --retry 3 "$base/bpf/headers/include/bpf/BpfUtils.h" -o "$RUNNER_TEMP/BpfUtils.h"
+          test -s "$RUNNER_TEMP/NetBpfLoad.cpp"
+          test -s "$RUNNER_TEMP/BpfUtils.h"
+
+      - name: Configure ARM64 with real Android Binder, SELinux and BPF support
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe-logs
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee probe-logs/defconfig.log
+          python3 tools/check_exynos7885_linux615_android_config.py stage \
+            --config kernel-out/.config --config-script kernel/scripts/config
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 olddefconfig \
+            2>&1 | tee probe-logs/olddefconfig.log
+          python3 tools/check_exynos7885_linux615_android_config.py check \
+            --config kernel-out/.config --makefile kernel/Makefile \
+            --loader "$RUNNER_TEMP/NetBpfLoad.cpp" --utils "$RUNNER_TEMP/BpfUtils.h" \
+            2>&1 | tee probe-logs/android17-version-config-gates.log
+          cp kernel-out/.config probe-logs/evaluated-arm64-android17-research.config
+
+      - name: Compile Linux 6.15 ARM64 kernel Image with Exynos and Android source
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 Image \
+            2>&1 | tee probe-logs/build.log
+          result=${PIPESTATUS[0]}
+          echo "$result" > probe-logs/build-exit-code.txt
+          exit "$result"
+
+      - name: Verify actual Image and key ARM64 kernel objects
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s kernel-out/arch/arm64/boot/Image
+          test -s kernel-out/vmlinux
+          for item in \
+            drivers/mmc/host/dw_mmc-exynos.o \
+            drivers/clk/samsung/clk-exynos7885.o \
+            drivers/pinctrl/samsung/pinctrl-exynos-arm64.o \
+            drivers/android/binder.o \
+            drivers/android/binderfs.o \
+            security/selinux/hooks.o; do
+            test -s "kernel-out/$item"
+            readelf -h "kernel-out/$item" | grep -q 'AArch64'
+            sha256sum "kernel-out/$item" | tee -a probe-logs/objects-sha256.txt
+          done
+          sha256sum kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/image-sha256.txt
+          stat -c '%n %s bytes' kernel-out/arch/arm64/boot/Image kernel-out/vmlinux | tee probe-logs/image-sizes.txt
+
+      - name: Preserve NON-FLASHABLE modern kernel research Image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-linux615-android17-source-kernel-Image-NOT-BOOTABLE-NOT-FLASHABLE
+          path: kernel-out/arch/arm64/boot/Image
+          retention-days: 4
+          if-no-files-found: error
+
+      - name: Preserve configuration, compiler and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exynos7885-linux615-android17-kernel-build-evidence
+          path: probe-logs/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: State exactly what this kernel probe cannot prove
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## SM-A750F Linux 6.15-rc1 Android Binder/BPF/SELinux research'
+            echo 'Immutable Linux source c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c'
+            echo "Kernel Image compilation exit: $(cat probe-logs/build-exit-code.txt 2>/dev/null || echo not-run)"
+            echo 'Version-gate check against immutable LineageOS 24.0 source is only one precondition.'
+            echo 'Any compiled Image is a generic ARM64 kernel Image with incomplete A7 board support, NOT FLASHABLE.'
+            echo 'Not evaluated: modern Android 17 runtime BPF, vendor ABI/HALs, SELinux policy, VINTF, modem, camera, display, memory carveouts or physical boot.'
+          } >> "$GITHUB_STEP_SUMMARY"

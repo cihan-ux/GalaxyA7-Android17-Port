@@ -1,0 +1,130 @@
+name: A7 ACPM mailbox real Linux 6.15 Kconfig and Kbuild archive (UNBOUND)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-mailbox-kbuild-integration.yml'
+      - 'port/linux-6.15/drivers/mailbox/exynos7885-acpm-mbox-prototype.c'
+      - 'tools/stage_exynos7885_mailbox_kernel_integration.py'
+      - 'tests/test_exynos7885_mailbox_kbuild_stage.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  temporary-linux615-kbuild-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout dev research files
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate opt-in safety and fail-closed Kbuild stager
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_exynos7885_mailbox_kbuild_stage.py -v
+          python3 -m unittest discover -s tests -p test_exynos7885_acpm_mailbox_prototype.py -v
+
+      - name: Install AArch64 build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch immutable Linux 6.15-rc1 Exynos7885 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          mkdir -p kbuild-evidence
+          git -C kernel rev-parse HEAD > kbuild-evidence/pinned-kernel-commit.txt
+
+      - name: Apply default-off Kconfig and actual Makefile wiring in temporary kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/stage_exynos7885_mailbox_kernel_integration.py --kernel-tree kernel
+          git -C kernel diff --check
+          git -C kernel diff -- drivers/mailbox/Kconfig drivers/mailbox/Makefile \
+            | tee kbuild-evidence/temporary-kbuild-changes.patch
+          grep -q 'config EXYNOS7885_ACPM_MBOX_LAB' kernel/drivers/mailbox/Kconfig
+          grep -q 'default n' kernel/drivers/mailbox/Kconfig
+          grep -q 'obj-$(CONFIG_EXYNOS7885_ACPM_MBOX_LAB)' kernel/drivers/mailbox/Makefile
+          if grep -R -n 'samsung,exynos7885-acpm-mbox-prototype' \
+               kernel/arch/arm64/boot/dts/exynos/; then
+            echo 'Unexpected A7 prototype DT node in upstream kernel' >&2
+            exit 1
+          fi
+
+      - name: Evaluate default-off vs explicitly enabled real ARM64 config
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kbuild-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee kbuild-evidence/defconfig.log
+          if grep -q '^CONFIG_EXYNOS7885_ACPM_MBOX_LAB=y' kbuild-out/.config; then
+            echo 'Experimental mailbox driver must default to off' >&2
+            exit 1
+          fi
+          grep -q '^CONFIG_MAILBOX=y' kbuild-out/.config
+          grep -q '^CONFIG_ARCH_EXYNOS=y' kbuild-out/.config
+          kernel/scripts/config --file kbuild-out/.config --enable EXYNOS7885_ACPM_MBOX_LAB
+          make -C kernel O="$GITHUB_WORKSPACE/kbuild-out" ARCH=arm64 LLVM=1 olddefconfig \
+            2>&1 | tee kbuild-evidence/olddefconfig.log
+          grep -qx 'CONFIG_EXYNOS7885_ACPM_MBOX_LAB=y' kbuild-out/.config
+          grep -qx 'CONFIG_MAILBOX=y' kbuild-out/.config
+          grep -qx 'CONFIG_ARCH_EXYNOS=y' kbuild-out/.config
+          echo 'PASS: Kconfig defaults OFF; explicit CI-only opt-in resolved to y.' \
+            | tee kbuild-evidence/config-result.txt
+
+      - name: Build real Kbuild drivers/mailbox/built-in.a with integrated Exynos7885 object
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kbuild-out" ARCH=arm64 LLVM=1 -j2 \
+            drivers/mailbox/built-in.a 2>&1 | tee kbuild-evidence/kbuild-archive.log
+          obj=kbuild-out/drivers/mailbox/exynos7885-acpm-mbox-prototype.o
+          archive=kbuild-out/drivers/mailbox/built-in.a
+          test -s "$obj"
+          test -s "$archive"
+          readelf -h "$obj" | grep -q 'Machine:.*AArch64'
+          llvm-ar t "$archive" | tee kbuild-evidence/archive-objects.txt
+          # LLVM thin archives list members with the output-directory prefix.
+          # Match the final basename rather than requiring a bare filename.
+          grep -Eq '(^|/)exynos7885-acpm-mbox-prototype[.]o$' kbuild-evidence/archive-objects.txt
+          sha256sum "$obj" "$archive" | tee kbuild-evidence/object-and-archive-sha256.txt
+          echo 'PASS: real Kbuild archive includes A7 experimental AArch64 platform-driver object.' \
+            | tee kbuild-evidence/build-result.txt
+
+      - name: Archive source and test evidence, no kernel/ROM artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A7-Linux615-mailbox-KBUILD-INTEGRATION-NOT-BOOTABLE
+          path: |
+            kbuild-evidence/*.txt
+            kbuild-evidence/*.log
+            kbuild-evidence/*.patch
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Delimit runtime status
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## A7 Exynos7885 ACPM mailbox: compile-time Kbuild integration'
+            echo 'Default OFF, explicitly enabled only in ephemeral pinned Linux 6.15 CI checkout.'
+            echo 'No DT compatible, no physical device, no ACPM queue/firmware integration, no S2MPU08 active power control.'
+            echo 'built-in.a is not linked vmlinux or bootable Android 17, and is NOT a flashable image.'
+          } >> "$GITHUB_STEP_SUMMARY"

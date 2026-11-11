@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from check_research_manifest import EXPECTED, MANIFEST, BLOCKERS, PINNED_REVISIONS
+from check_research_manifest import EXPECTED, MANIFEST, BLOCKERS, PINNED_REVISIONS, PROJECTS
 
 
 class ResearchManifestTests(unittest.TestCase):
@@ -21,7 +21,8 @@ class ResearchManifestTests(unittest.TestCase):
     def test_remote_is_expected(self):
         remotes = {r.get("name"): r.get("fetch") for r in self.root.findall("remote")}
         self.assertEqual(remotes.get("exynos7885-dev"), "https://github.com/exynos7885-dev/")
-        self.assertTrue(all(p.get("remote") == "exynos7885-dev" for p in self.projects))
+        self.assertEqual(remotes.get("lineageos"), "https://github.com/LineageOS/")
+        self.assertTrue(all(p.get("remote") == PROJECTS[p.get("path")][1] for p in self.projects))
 
     def test_xml_root(self):
         self.assertEqual(self.root.tag, "manifest")
@@ -36,6 +37,7 @@ class ResearchManifestTests(unittest.TestCase):
             self.assertIn(path, paths)
             self.assertEqual(paths[path].get("name"), name)
             self.assertEqual(paths[path].get("revision"), PINNED_REVISIONS[path])
+            self.assertEqual(paths[path].get("remote"), PROJECTS[path][1])
 
     def test_not_misrepresented_as_android17(self):
         self.assertTrue(all(p.get("revision") == PINNED_REVISIONS[p.get("path")] for p in self.projects))

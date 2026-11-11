@@ -1,0 +1,111 @@
+name: A7 Android 11 pinned source checkout (NO ROM)
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - 'manifests/lineage-18.1-research.xml'
+      - 'tools/compose_lineage18_overlay.py'
+      - '.github/workflows/a7-lineage18-pinned-baseline.yml'
+permissions:
+  contents: read
+jobs:
+  checkout-a7-sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Initialize Android 11 platform metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/a7-lineage18" evidence
+          curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          cd "$RUNNER_TEMP/a7-lineage18"
+          "$HOME/bin/repo" init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          "$HOME/bin/repo" manifest -o "$GITHUB_WORKSPACE/evidence/upstream-projects.xml"
+      - name: Compose exact pinned A7 overlay and verify resulting manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/a7-lineage18"
+          python3 "$GITHUB_WORKSPACE/tools/compose_lineage18_overlay.py" \
+            --base "$GITHUB_WORKSPACE/evidence/upstream-projects.xml" \
+            --out .repo/local_manifests/a7y18lte-pinned.xml
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/combined-projects.xml"
+          python3 - "$GITHUB_WORKSPACE/evidence/combined-projects.xml" \
+                     "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" \
+                     "$GITHUB_WORKSPACE/evidence/pinned-paths.txt" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          combined, pinned = [ET.parse(x).getroot() for x in sys.argv[1:3]]
+          actual = {p.get('path') or p.get('name'): p for p in combined.findall('project')}
+          expected = {p.get('path'): p for p in pinned.findall('project')}
+          if len(expected) != 13:
+              raise SystemExit('Expected exactly 13 immutable research pins')
+          for path, element in expected.items():
+              match = actual.get(path)
+              if match is None or match.get('revision') != element.get('revision'):
+                  raise SystemExit('Unresolved pinned project at ' + path)
+          with open(sys.argv[3], 'w') as output:
+              output.write('\n'.join(sorted(expected)) + '\n')
+          print('PASS: all 13 source SHA pins resolved in combined manifest')
+          PY
+      - name: Sync thirteen pinned source projects, bounded to 15 minutes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/a7-lineage18"
+          set +e
+          xargs -r -a "$GITHUB_WORKSPACE/evidence/pinned-paths.txt" \
+            timeout --signal=TERM --kill-after=20s 900 \
+            repo sync -c -j2 --no-clone-bundle --no-tags --fail-fast \
+            > "$GITHUB_WORKSPACE/evidence/pinned-sync.log" 2>&1
+          status=$?
+          set -e
+          printf 'sync_exit=%s\n' "$status" | tee "$GITHUB_WORKSPACE/evidence/sync-status.txt"
+          tail -n 35 "$GITHUB_WORKSPACE/evidence/pinned-sync.log"
+          exit "$status"
+      - name: Verify each checked-out Git revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/a7-lineage18" \
+                     "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" \
+                     "$GITHUB_WORKSPACE/evidence/pinned-heads.txt" <<'PY'
+          import pathlib
+          import subprocess
+          import sys
+          import xml.etree.ElementTree as ET
+          root, manifest, output = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+          projects = ET.parse(manifest).getroot().findall('project')
+          lines = []
+          for project in projects:
+              path, expected = project.get('path'), project.get('revision')
+              checked = subprocess.check_output(
+                  ['git', '-C', str(root / path), 'rev-parse', 'HEAD'], text=True).strip()
+              if checked != expected:
+                  raise SystemExit('MISMATCH at ' + path)
+              lines.append('VERIFIED ' + path + ' ' + checked)
+          output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          print('PASS: {} verified immutable source checkouts'.format(len(lines)))
+          PY
+      - name: Save only safe evidence and resource usage
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence
+          df -h "$RUNNER_TEMP" > evidence/disk.txt
+          free -h > evidence/memory.txt
+          echo 'Source-only checkout. No complete platform build, ROM ZIP or phone access.' > evidence/README.txt
+          rm -f evidence/upstream-projects.xml evidence/combined-projects.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a7-lineage18-pinned-checkout-evidence
+          path: evidence/
+          retention-days: 7

@@ -1,0 +1,86 @@
+name: Galaxy A7 targeted source sync probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-targeted-source-sync.yml'
+permissions:
+  contents: read
+jobs:
+  targeted-sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install repo launcher
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin" "$RUNNER_TEMP/a7-sync" evidence
+          curl --fail --location --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Initialize only pinned research manifest
+        working-directory: ${{ runner.temp }}/a7-sync
+        run: |
+          set -euo pipefail
+          repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --no-clone-bundle
+          mkdir -p .repo/local_manifests
+          cp "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" .repo/local_manifests/a7-research.xml
+          # The research manifest overlaps with the upstream platform manifest.
+          # Convert it to a standalone repo manifest before syncing selected projects.
+          python3 - "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" .repo/manifest.xml <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          source, dest = sys.argv[1:]
+          root = ET.parse(source).getroot()
+          for child in list(root):
+              if child.tag == 'include':
+                  raise SystemExit('Unexpected include in standalone research manifest')
+          ET.ElementTree(root).write(dest, encoding='unicode', xml_declaration=True)
+          PY
+          rm .repo/local_manifests/a7-research.xml
+          repo manifest -o "$GITHUB_WORKSPACE/evidence/targeted-declared.xml"
+      - name: Sync three core device projects with captured evidence
+        working-directory: ${{ runner.temp }}/a7-sync
+        run: |
+          set -euo pipefail
+          set +e
+          timeout --signal=TERM --kill-after=15s 600 repo sync -c -j2 --no-clone-bundle --no-tags --fail-fast device/samsung/a7y18lte device/samsung/exynos7885-common kernel/samsung/exynos7885 > "$GITHUB_WORKSPACE/evidence/targeted-sync.log" 2>&1
+          status=$?
+          set -e
+          tail -n 100 "$GITHUB_WORKSPACE/evidence/targeted-sync.log"
+          printf 'sync_exit=%s\n' "$status" > "$GITHUB_WORKSPACE/evidence/targeted-status.txt"
+          if [ "$status" -eq 0 ]; then
+            # A resolved manifest needs ALL 13 projects checked out; only 3 were synced.
+            # Verify the exact pinned revisions directly for the selected paths.
+            for p in device/samsung/a7y18lte device/samsung/exynos7885-common kernel/samsung/exynos7885; do
+              printf '%s ' "$p" >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
+              git -C "$p" rev-parse HEAD >> "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
+            done
+            python3 -c '
+          import sys
+          import xml.etree.ElementTree as ET
+          manifest, heads = sys.argv[1:]
+          pins = {p.get("path"): p.get("revision") for p in ET.parse(manifest).getroot().findall("project")}
+          for line in open(heads):
+              path, head = line.split()
+              expected = pins[path]
+              if head != expected:
+                  raise SystemExit(f"Revision mismatch {path}: expected {expected}, got {head}")
+              print(f"VERIFIED {path} {head}")
+          ' "$GITHUB_WORKSPACE/manifests/lineage-18.1-research.xml" "$GITHUB_WORKSPACE/evidence/targeted-heads.txt"
+          fi
+          exit "$status"
+      - name: Capture resources
+        if: always()
+        run: |
+          df -h > evidence/disk.txt
+          free -h > evidence/memory.txt
+          echo 'Only three historical LineageOS 18.1 source projects synced; no Soong or ROM build, no phone access.' > evidence/README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a7-targeted-sync-evidence
+          path: evidence/
+          retention-days: 7

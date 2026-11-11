@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung Galaxy A7 (2018) / SM-A750F (a7y18lte)
+ *
+ * RESEARCH-ONLY Exynos7885 SoC/DTS syntax scaffold.
+ *
+ * This is NOT a hardware-complete board DTS. No verified A7-specific
+ * DRAM map, reserved memory, regulator, boot MMC, UART, power-key,
+ * touchscreen, modem, Wi-Fi or display nodes have been ported.
+ * No one should attempt to boot or flash this DTB.
+ *
+ * Hardware revision 00/01/03 distinctions in the legacy Samsung tree
+ * have not been resolved against a physical handset.
+ *
+ * SoC include from Mollomm1/linux-exynos7885:
+ *   c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c (Linux 6.15-rc1)
+ * Legacy A7 sources for future board-specific mapping:
+ *   exynos7885-dev/kernel_samsung_exynos7885
+ *   6020dfa8315134187f07ca903c9d2ed7ee0256f5
+ */
+
+/dts-v1/;
+#include "exynos7885.dtsi"
+
+/ {
+	model = "Samsung Galaxy A7 (2018) SM-A750F (research-only)";
+	compatible = "samsung,a7y18lte", "samsung,exynos7885";
+	chassis-type = "handset";
+
+	/*
+	 * Intentionally no /memory node, reserved-memory, enabled peripheral
+	 * or A8/jackpotlte board data. The resulting DTB cannot boot a phone.
+	 * Add each hardware node only after validating an A7-specific source
+	 * and its matching driver against the modern kernel.
+	 */
+};

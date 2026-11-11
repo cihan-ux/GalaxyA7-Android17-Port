@@ -1,5 +1,7 @@
 # SLSI BoardConfig7885 source-level inspection
 
+Update: a [maintained 18.1 config](slsi-matching-source-discovery.md) is now recorded at an immutable revision. It selects `libhwc2.1`, unlike the newer candidate's `hwc3`. The comparison below remains candidate research, not a substitute for the matching baseline sources.
+
 **2026-11-05 — Candidate only, not approved for build.**
 
 Source: [Exynos2100-common/android_hardware_samsung_slsi-linaro_config, lineage-21](https://github.com/Exynos2100-common/android_hardware_samsung_slsi-linaro_config/tree/lineage-21).

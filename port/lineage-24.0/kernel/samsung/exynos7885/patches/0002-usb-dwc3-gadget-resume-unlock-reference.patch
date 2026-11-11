@@ -1,0 +1,35 @@
+From 2a074fb85d78d065df5c529d7c0d748454bcaa3a Mon Sep 17 00:00:00 2001
+From: Jiebing Li <jiebing.li@intel.com>
+Date: Thu, 11 Dec 2014 05:26:29 +0000
+Subject: [PATCH] usb: dwc3: gadget: release spin lock during gadget resume
+
+Reference-only copy of the upstream source change applied by A2L5E0X1
+on 2026-11-08 to exynos7885-dev's Linux 4.4.302 kernel. This is NOT
+a Linux 5.10/5.15 forward-port or a flashable Android 17 change.
+Upstream commit: 2a074fb85d78d065df5c529d7c0d748454bcaa3a
+Upstream parent: 6020dfa8315134187f07ca903c9d2ed7ee0256f5
+
+It's a requirement that we release controller's lock
+while calling gadget API function pointers. This
+patch just fixes that long standing bug.
+
+Change-Id: Id4ccbaca290c0088933a2bc951e42947573fbfb8
+Signed-off-by: Jiebing Li <jiebing.li@intel.com>
+Signed-off-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+---
+ drivers/usb/dwc3/gadget.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+--- a/drivers/usb/dwc3/gadget.c
++++ b/drivers/usb/dwc3/gadget.c
+@@ -2993,7 +2993,9 @@ static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc)
+ 	 */
+ 
+ 	if (dwc->gadget_driver && dwc->gadget_driver->resume) {
++		spin_unlock(&dwc->lock);
+ 		dwc->gadget_driver->resume(&dwc->gadget);
++		spin_lock(&dwc->lock);
+ 	}
+ }
+ 

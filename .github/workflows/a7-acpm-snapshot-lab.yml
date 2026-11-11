@@ -1,0 +1,32 @@
+name: A7 ACPM read-only SRAM snapshot host test (NO MMIO)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-snapshot-lab.yml'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-snapshot-lab.*'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.*'
+      - 'tests/native/test_a7_acpm_snapshot.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Compile and execute snapshot tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=port/linux-6.15/drivers/firmware/samsung
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -I"$dir" \
+            "$dir/exynos7885-acpm-snapshot-lab.c" \
+            "$dir/exynos7885-acpm-sram-abi-lab.c" \
+            tests/native/test_a7_acpm_snapshot.c -o "$RUNNER_TEMP/snapshot-test"
+          "$RUNNER_TEMP/snapshot-test"
+          ! grep -E 'ioremap|readl\(|writel\(|request_irq|platform_driver_register' \
+            "$dir/exynos7885-acpm-snapshot-lab.c"

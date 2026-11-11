@@ -1,0 +1,135 @@
+name: A7 ACPM complete mock read plan host + ARM64 compiler test (NO IO)
+'on':
+  push:
+    branches: [dev/evidence-based-source-audit]
+    paths:
+      - '.github/workflows/a7-acpm-read-queue-plan.yml'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-read-plan-lab.*'
+      - 'port/linux-6.15/drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.*'
+      - 'port/linux-6.15/drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.*'
+      - 'tools/check_a7_acpm_read_plan.py'
+      - 'tests/test_a7_acpm_read_plan.py'
+      - 'tests/native/test_a7_acpm_read_plan.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  simulate-only-bounded-acpm-read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated read plan code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Reject hardware I/O and validate native full read-request preparation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mock-read-evidence
+          python3 tools/check_a7_acpm_read_plan.py
+          python3 -m unittest discover -s tests -p test_a7_acpm_read_plan.py -v
+          dir=port/linux-6.15/drivers/firmware/samsung
+          cc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -I"$dir" \
+            "$dir/exynos7885-acpm-read-plan-lab.c" \
+            "$dir/exynos7885-acpm-sram-abi-lab.c" \
+            "$dir/s2mpu08-a7-acpm-frame-lab.c" \
+            tests/native/test_a7_acpm_read_plan.c \
+            -o "$RUNNER_TEMP/acpm-read-plan-offline"
+          "$RUNNER_TEMP/acpm-read-plan-offline" \
+            | tee mock-read-evidence/offline-read-plan.log
+
+      - name: Pin old firmware sequence and doorbell semantics against source
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/acpm_ipc.c
+          curl -fLsS --retry 3 "$url" -o "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          framework_url=https://raw.githubusercontent.com/exynos7885-dev/kernel_samsung_exynos7885/6020dfa8315134187f07ca903c9d2ed7ee0256f5/drivers/soc/samsung/acpm/fw_header/framework.h
+          curl -fLsS --retry 3 "$framework_url" -o "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'TYPE_QUEUE = 1' "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'TYPE_BUFFER,' "$RUNNER_TEMP/pinned-acpm-framework.h"
+          grep -Fq 'if (channel->type == TYPE_BUFFER)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'if (++channel->seq_num == 64)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq '(channel->seq_num & 0x3f) << ACPM_IPC_PROTOCOL_SEQ_NUM' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq '__raw_writel((1 << id) << 16, acpm_ipc->intr + INTGR0)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'static bool check_response(' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq '(data >> ACPM_IPC_PROTOCOL_SEQ_NUM) & 0x3f' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'if (i != rear)' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'rear = rear % channel->rx_ch.len;' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          grep -Fq 'acpm_ipc->initdata->ipc_ap_max' "$RUNNER_TEMP/pinned-acpm-ipc.c"
+          echo 'PASS: pinned old request sequence, doorbell and response ring matcher source' \
+            | tee mock-read-evidence/legacy-sequence-gate.txt
+          sha256sum "$RUNNER_TEMP/pinned-acpm-ipc.c" "$RUNNER_TEMP/pinned-acpm-framework.h" \
+            > mock-read-evidence/old-ipc-source-sha256.txt
+
+      - name: Install ARM64 Linux toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev dwarves zstd
+
+      - name: Fetch immutable Linux 6.15 experimental Exynos7885 kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+
+      - name: Build all three actual inert request components as AArch64 objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=port/linux-6.15/drivers/firmware/samsung
+          cp "$dir/exynos7885-acpm-read-plan-lab.c" \
+            "$dir/exynos7885-acpm-read-plan-lab.h" \
+            "$dir/exynos7885-acpm-sram-abi-lab.c" \
+            "$dir/exynos7885-acpm-sram-abi-lab.h" \
+            "$dir/s2mpu08-a7-acpm-frame-lab.c" \
+            "$dir/s2mpu08-a7-acpm-frame-lab.h" \
+            kernel/drivers/firmware/samsung/
+          ! grep -q 'exynos7885-acpm-read-plan-lab' kernel/drivers/firmware/samsung/Makefile
+          make -C kernel O="$GITHUB_WORKSPACE/mock-read-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee mock-read-evidence/defconfig.log
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/mock-read-out" ARCH=arm64 LLVM=1 \
+            drivers/firmware/samsung/exynos7885-acpm-read-plan-lab.o \
+            drivers/firmware/samsung/exynos7885-acpm-sram-abi-lab.o \
+            drivers/firmware/samsung/s2mpu08-a7-acpm-frame-lab.o \
+            2>&1 | tee mock-read-evidence/arm64-object-build.log
+          for obj in exynos7885-acpm-read-plan-lab exynos7885-acpm-sram-abi-lab s2mpu08-a7-acpm-frame-lab; do
+            f="mock-read-out/drivers/firmware/samsung/$obj.o"
+            test -s "$f"
+            readelf -h "$f" | grep -q 'Machine:.*AArch64'
+            sha256sum "$f" | tee -a mock-read-evidence/arm64-objects-sha256.txt
+          done
+          echo 'PASS: 3 AArch64 objects including inert read request+reply match; no device I/O' \
+            | tee mock-read-evidence/scope.txt
+
+      - name: Archive source/compiler evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A7-ACPM-OFFLINE-READ-PLAN-NO-IO-NO-FLASH
+          path: |
+            mock-read-evidence/*.txt
+            mock-read-evidence/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: State what this test does not validate
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Offline S2MPU08 ACPM read lifecycle, NO real firmware'
+            echo 'Bounded SRAM queue index, sequence 1-63, four-word PMIC read and correct upper-half INTGR0 doorbell values only.'
+            echo 'No kernel ACPM controller binding, SRAM mapping, mailbox traffic, voltage writes or Android 17 device boot.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -2,6 +2,8 @@
 
 **Status: incomplete; do not start a full ROM build or flash.** This is an inventory of dependencies referenced by pinned upstream source files, not a working Android 17 manifest.
 
+Update: [matching maintained 18.1 SLSI candidates](slsi-matching-source-discovery.md) and a pinned Samsung `mkbootimg.mk` source fixture have been located. Discovery is improved, but those dependencies are still absent from this three-project manifest and have not been validated as a complete build set. See the [source evidence audit](source-evidence-audit.md).
+
 ## Confirmed source repositories
 
 | Local path | Source | Revision |

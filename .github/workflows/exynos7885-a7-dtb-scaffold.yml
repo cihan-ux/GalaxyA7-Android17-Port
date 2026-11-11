@@ -1,0 +1,164 @@
+name: Galaxy A7 experimental Linux 6.15 DTB syntax build (NOT BOOTABLE)
+'on':
+  push:
+    branches:
+      - dev/evidence-based-source-audit
+    paths:
+      - '.github/workflows/exynos7885-a7-dtb-scaffold.yml'
+      - 'port/linux-6.15/arch/arm64/boot/dts/exynos/**'
+      - 'tools/check_exynos7885_a7_keys_stage.py'
+      - 'tests/test_exynos7885_a7_keys_stage.py'
+      - 'tools/check_exynos7885_a7_emmc_stage.py'
+      - 'tests/test_exynos7885_a7_emmc_stage.py'
+      - 'tools/check_exynos7885_a7_dts_scaffold.py'
+      - 'tests/test_exynos7885_a7_dts_scaffold.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  a7-identity-dtb-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Reject unverified A7 hardware declarations
+        run: |
+          python3 tools/check_exynos7885_a7_dts_scaffold.py
+          python3 tools/check_exynos7885_a7_emmc_stage.py
+          python3 tools/check_exynos7885_a7_keys_stage.py
+          python3 -m unittest discover -s tests -p test_exynos7885_a7_dts_scaffold.py -v
+          python3 -m unittest discover -s tests -p test_exynos7885_a7_emmc_stage.py -v
+          python3 -m unittest discover -s tests -p test_exynos7885_a7_keys_stage.py -v
+
+      - name: Install ARM64 kernel DTB prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            git make clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bc bison flex libssl-dev libelf-dev device-tree-compiler
+
+      - name: Fetch immutable Linux 6.15-rc1 Exynos7885 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init kernel
+          git -C kernel remote add origin https://github.com/Mollomm1/linux-exynos7885.git
+          git -C kernel -c protocol.version=2 fetch --depth 1 --filter=blob:none \
+            origin c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          git -C kernel checkout --detach FETCH_HEAD
+          test "$(git -C kernel rev-parse HEAD)" = c9639f4bb4a8b307dea059b404d5f0a8b0fe0e4c
+          grep -Eq '^VERSION = 6$' kernel/Makefile
+          grep -Eq '^PATCHLEVEL = 15$' kernel/Makefile
+          grep -Fq '"samsung,exynos7885"' kernel/arch/arm64/boot/dts/exynos/exynos7885.dtsi
+
+      - name: Stage only the A7 minimal DTS and Kbuild target
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp port/linux-6.15/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dts \
+             kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dts
+          cp port/linux-6.15/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dts \
+             kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dts
+          cp port/linux-6.15/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dts \
+             kernel/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dts
+          printf '\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte.dtb\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte-emmc-lab.dtb\ndtb-$(CONFIG_ARCH_EXYNOS) += exynos7885-a7y18lte-keys-lab.dtb\n' \
+             >> kernel/arch/arm64/boot/dts/exynos/Makefile
+          git -C kernel diff --check
+          mkdir -p probe-logs
+          git -C kernel diff --stat | tee probe-logs/staged-delta.txt
+
+      - name: Configure ARM64 Linux 6.15 and build device trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C kernel O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 defconfig \
+            2>&1 | tee probe-logs/config.log
+          grep -qx 'CONFIG_ARCH_EXYNOS=y' kernel-out/.config
+          make -C kernel -j2 O="$GITHUB_WORKSPACE/kernel-out" ARCH=arm64 LLVM=1 dtbs \
+            2>&1 | tee probe-logs/build.log
+
+      - name: Verify compiled A7 identity and intentionally missing memory configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          dtb=kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dtb
+          test -s "$dtb"
+          model="$(fdtget -t s "$dtb" / model)"
+          compatible="$(fdtget -t s "$dtb" / compatible)"
+          test "$model" = 'Samsung Galaxy A7 (2018) SM-A750F (research-only)'
+          [[ "$compatible" == 'samsung,a7y18lte samsung,exynos7885' ]]
+          if fdtget "$dtb" /memory reg >/dev/null 2>&1; then
+            echo 'An unverified memory map was unexpectedly supplied' >&2
+            exit 1
+          fi
+          if [[ "$compatible" == *jackpotlte* ]]; then
+            echo 'A8 identity leak' >&2
+            exit 1
+          fi
+          echo "model=$model" | tee probe-logs/a7-identity.txt
+          echo "compatible=$compatible" | tee -a probe-logs/a7-identity.txt
+          echo "memory map=ABSENT (intentionally nonbootable)" | tee -a probe-logs/a7-identity.txt
+          sha256sum "$dtb" | tee probe-logs/a7-minimal-dtb-sha256.txt
+          lab=kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dtb
+          test -s "$lab"
+          test "$(fdtget -t s "$lab" / model)" = "$model"
+          test "$(fdtget -t s "$lab" /soc@0/mmc@13500000 status)" = 'okay'
+          test "$(fdtget -t x "$lab" /soc@0/mmc@13500000 bus-width)" = '8'
+          if fdtget "$lab" /memory reg >/dev/null 2>&1; then
+            echo 'eMMC lab accidentally has guessed RAM' >&2
+            exit 1
+          fi
+          echo 'eMMC lab MMC0=okay; 8-bit bus; RAM=ABSENT; NOT BOOTABLE' | tee probe-logs/a7-emmc-lab.txt
+          sha256sum "$lab" | tee probe-logs/a7-emmc-lab-sha256.txt
+          keys=kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dtb
+          test -s "$keys"
+          test "$(fdtget -t s "$keys" / model)" = "$model"
+          test "$(fdtget -t s "$keys" /soc@0/mmc@13500000 status)" = 'okay'
+          test "$(fdtget -t x "$keys" /gpio-keys/volume-up linux,code)" = '73'
+          test "$(fdtget -t x "$keys" /gpio-keys/volume-down linux,code)" = '72'
+          test "$(fdtget -t x "$keys" /gpio-keys/power linux,code)" = '74'
+          if fdtget "$keys" /memory reg >/dev/null 2>&1; then
+            echo 'A7 GPIO-keys lab has unverified memory' >&2
+            exit 1
+          fi
+          echo 'A7 gpa1 power/volume key codes staged for syntax only' | tee probe-logs/a7-keys-lab.txt
+          sha256sum "$keys" | tee probe-logs/a7-keys-lab-sha256.txt
+
+      - name: Preserve research-only DTS proof (NEVER FLASH)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a7y18lte-615-minimal-DTB-NO-MEMORY-NOT-BOOTABLE-NOT-FLASHABLE
+          path: |
+            kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte.dtb
+            kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-emmc-lab.dtb
+            kernel-out/arch/arm64/boot/dts/exynos/exynos7885-a7y18lte-keys-lab.dtb
+          retention-days: 7
+
+      - name: Upload DTB build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a7y18lte-615-dtb-build-logs
+          path: probe-logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report limitations
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## SM-A750F experimental Exynos7885 Linux 6.15-rc1 DTS syntax probe'
+            echo 'This intentionally lacks A7 memory/reserved-memory, regulators, board pins and peripherals.'
+            echo 'Successful DTB compilation proves only source and identity syntax.'
+            echo 'All three A7 DTBs (minimal, MMC and GPIO keys) are NEVER FLASHABLE.'
+            echo 'The eMMC lab only proves a source-matched controller node can compile.'
+            echo 'Neither DTB boots Android 17 or any other OS.'
+          } >> "$GITHUB_STEP_SUMMARY"

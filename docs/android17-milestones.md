@@ -1,24 +1,48 @@
 # Android 17 port: evidence-based milestone tracker
 
-This tracker separates verified source preparation from device and build validation. **No flashable ROM exists.**
+This tracker separates actual compiler evidence, source checks and hardware functionality.
+**No flashable Android 17 ROM exists. No phone has been accessed.**
 
 | Gate | Status | Evidence / unblock requirement |
 |---|---|---|
-| G0: Source provenance | PASS (research only) | Three LineageOS 18.1 projects pinned to commit hashes |
-| G1: Manifest structure | PASS (research only) | GitHub Actions offline tests |
-| G2: Partition arithmetic | PASS (source arithmetic only) | Super sum and reserve validated, not device topology |
-| G3: Exact SM-A750F partition topology | BLOCKED | Read-only device-specific partition layout evidence needed |
-| G4: SM-A750F vendor provenance | BLOCKED | Upstream A750FN blob list differs from A750F stock build |
-| G5: Complete historical BSP dependencies | BLOCKED | Vendor trees, Samsung SLSI and boot tooling unresolved |
-| G6: Reproducible historical baseline build | NOT STARTED | G3–G5 must be addressed first |
-| G7: Android 17 API/HAL/VINTF/SELinux port | NOT STARTED | No compatible target implementation verified |
-| G8: Boot/recovery validation | NOT STARTED | Requires backups, safe recovery plan and explicit user approval |
+| G0: Source provenance | PARTIAL | Pinned LineageOS 18.1 device/common/kernel sources, but incomplete historical BSP/vendor provenance |
+| G1: Research manifest and offline tests | PASS (research only) | GitHub Actions research-validation checks |
+| G2: Partition arithmetic | PASS (source arithmetic only) | Exact on-device partition layout unverified |
+| G3: Exact SM-A750F partition topology | BLOCKED | Read-only model-specific device evidence needed |
+| G4: SM-A750F vendor provenance | BLOCKED | A750FN reference is not verified interchangeable with SM-A750F firmware |
+| G5: Complete historical BSP dependencies | BLOCKED | Samsung SLSI, boot tooling, vendor services, licenses and full platform source closure |
+| G6a: Linux 4.4.302 baseline ARM64 kernel Image | PASS (compiled, non-flashable) | [CI 41951781918](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/41951781918), Image size and SHA-256 verified |
+| G6b: Linux 4.4.302 BPF-enabled ARM64 kernel Image | PASS (compiled, non-flashable) | [CI 42235116992](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42235116992): 23,840,488 bytes, SHA-256 `069302468615291875fd6a3e6139a4af0f3c4e6ae02875a8348cd0c427f0cb79`; kernel ELF and BPF object verified |
+| G6c: Complete LineageOS 18.1 baseline ROM | NOT BUILT | Kernel Image is only one input; G3–G5 remain unresolved |
+| G7a: Android 17 NetBpfLoad kernel gate | BLOCKED (verified source requirement) | [Pinned LineageOS 24.0 loader](android17-netbpf-kernel-gate.md) requires >=5.10 for API 3700, >=5.15 for 3710; 4.4.302 fails |
+| G7c: Experimental Linux 6.15-rc1 A7 DTS source | PASS (minimal A7 DTB syntax only) | [CI 42503704081](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42503704081) compiled model-correct a7y18lte DTB. No RAM map, storage, or boot support in the minimal DTB; [eMMC-only lab source](a7y18lte-emmc-modern-source-mapping.md) is being tested separately. Not an Android 17 kernel Image/ROM. |
+| G7d: Linux 6.15 A7 peripheral and memory validation | PARTIAL (source only) | [eMMC DTB CI 42504144337](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42504144337) passed; [GPIO-keys lab](a7y18lte-gpio-keys-linux615-mapping.md) maps common A7 power/volume pins with dedicated CI. Real RAM carveouts, storage I/O, key electrical polarity, regulators and other drivers are unverified. |
+| G7e: Linux 6.15 Android 17 kernel config/Image experiment | PASS (genuine Image compilation only; NOT BOOTABLE) | [Image CI 42505758584](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42505758584) compiled 39,526,912-byte ARM64 Image, SHA-256 `160355fbd5dd321112cf791fe103db4d76d7fe6f6e34e0cb760e10c6ca840755`; Exynos MMC/clock/pinctrl + Binder/binderfs + SELinux objects verified. 6.15 satisfies NetBpfLoad **version check only**; not A7 runtime/ROM. |
+| G7f: A7 S2MPU08/ACPM PMIC driver | BLOCKED (source-verified) | [PMIC gap CI 42508771359](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42508771359) confirms old A7 S2MPU08 driver and missing Linux 6.15 MFD/regulator integration in audited paths. LDO2/vqmmc, LDO35/vmmc and ACPM transport must be brought up safely. |
+| G7g: Targeted modern ARM64 driver object build | PASS (actual kernel compiler objects only) | [Focused driver CI 42508948297](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42508948297) compiled seven actual AArch64 Exynos MMC/clock/pinctrl, Binder/binderfs, SELinux and BPF objects; not real A7 PMIC support. |
+| G7h: S2MPU08 first voltage-only modern C source | PARTIAL (ARM64 object compiles; NO DRIVER) | [CI 42515323634](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42515323634) compiled original LDO2/LDO35 voltage-only metadata as genuine Linux 6.15 object. Follow-up [CI 42515547576](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42515547576) verifies pinned legacy sparse enum IDs and revised board-clamped source. No ACPM I/O, PMIC probe, IRQ, regulator enable or runtime test. |
+| G7i: ACPM PMIC protocol read framing | PASS (inert AArch64 object only; transport BLOCKED) | [ACPM CI 42517454955](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42517454955) passed 512 read-only C message vectors and real AArch64 object compilation. Exynos7885 firmware initdata 0x4B80 differs from GS101 0xA000; modern ACPM and mailbox only support GS101 in their compatible tables ([follow-up CI 42517688188](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42517688188)). No live IPC, mailbox port, regulator or working PMIC. |
+| G7j: Legacy A7 ↔ modern ACPM SRAM/channel ABI | PASS (offset tests and compiler ONLY) | [ABI CI 42609437249](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42609437249) confirmed pinned old/new 28-byte firmware prefix and 72-byte channel ABI field alignment via native C and AArch64 object compile. Physical SRAM firmware behavior not checked. |
+| G7k: Model-specific Exynos7885 mailbox driver source | PASS (corrected AArch64 compile; NO hardware) | [CI 42613382173](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42613382173) compiled revised ARM64 prototype and pinned-source tests confirming AP→APM `INTGR0=0x08`, `BIT(channel)<<16`, not the earlier wrong-direction INTGR1. Still **no DTS binding** or runtime proof. |
+| G7l: Experimental Exynos7885 mailbox Kconfig/Kbuild integration | PASS (revised archive, no device) | [CI 42613303553](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42613303553) confirmed default-OFF Kconfig and real Linux 6.15 AArch64 `built-in.a` containing the corrected INTGR0 prototype after CI-only opt-in. No firmware IPC/PMIC device operation. |
+| G7m: S2MPU08 complete mock read request/ACPM queue planning | PASS (inert host C + 3 ARM64 objects; no firmware) | [CI 42614880503](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42614880503) verified pinned old `TYPE_QUEUE=1` vs `TYPE_BUFFER=2`, six-bit sequence 1..63, correct `INTGR0` doorbell, ring boundaries/full queue and three separate Linux 6.15 AArch64 research objects. No actual SRAM mapping/PMIC communication. |
+| G7n: S2MPU08 offline reply-ring completion plan | PASS (host C, source pins, 3 ARM64 objects; NO HARDWARE) | [CI 42616562784](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42616562784) **completed successfully**: native C, pinned `check_response()` source guard and three Linux 6.15 AArch64 object builds. Matches six-bit sequence/type/register; tests stale and error replies, wrap, planned rear advance. No actual SRAM mutation, IRQ acknowledgement or firmware I/O. |
+| G7o: Synthetic request lifecycle, wraparound and timeout quarantine | PASS (source/host C and AArch64 compile only) | [CI 42618707342](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42618707342) passed synthetic timeout, late response, firmware error, no concurrent replacement, timed-out sequence 7/8/63 quarantine and three genuine Linux 6.15 AArch64 objects. Still no real runtime synchronization or PMIC. |
+| G7p: Offline safe sequence allocator | PASS (host C + AArch64, no hardware) | [CI 42619169717](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42619169717) completed successfully, verifying 1..63 wraparound, quarantined-ID skips, full exhaustion and refusal while pending. |
+| G7q: Offline monotonic input sampling and ambiguous-time guard | PASS (source/host C + AArch64, no hardware) | [CI 42694161812](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42694161812) passed negative-time/distant-sample rejection and real compiler-object checks. Rejects backwards synthetic samples without expiring a read. No runtime kernel clock. |
+| G7r: Atomic offline S2MPU08 read initiation | PASS (native C and Linux 6.15 ARM64 compile; NO HARDWARE) | [CI 42694864831](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42694864831) passed sequence allocation, ring geometry, timeout policy and atomic output update in one synthetic function, including pending/full-queue failure paths. No hardware I/O or full firmware controller. |
+| G7s: ACPM lifecycle state integrity and cross-session synthetic clock | PASS (native/source + three AArch64 research objects) | [CI 42705811004](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42705811004) passed invalid/unknown lifecycle-state checks, inconsistent status or sequence validation, and rejection of backwards/ambiguous restart times. No physical ACPM messages, S2MPU08 voltage control or A7 boot. |
+| G7u: Double-view Exynos7885 ACPM descriptor snapshot | PASS (offline host C + freestanding AArch64, no IO) | [CI 42796229160](https://github.com/cihan-ux/GalaxyA7-Android17-Port/actions/runs/42796229160) passed 72-byte channel-2 descriptor decoding, A7 firmware prefix validation, stable queue indices, torn-snapshot rejection and source mutation tests. Two separate ordinary RAM images only; **not SRAM mapping, IRQ or live firmware**. |
+| G7b: Android 17 VINTF/SELinux/HAL/vendor port | NOT VALIDATED | Old FCM3/SELinux, legacy HALs, boot/partition path and vendor symbols unresolved |
+| G8: Device boot/recovery | NOT STARTED | Explicit approval, backups, hardware and restoration plan required |
 
-## Next highest-value actions
+## Highest-value next actions
 
-1. Verify which public BSP dependencies match the pinned historical source and their licenses; do not assume source availability equals compatibility.
-2. Add non-destructive source-level checks and tests for variant mismatch and dependency closure.
-3. Request only **privacy-minimized**, read-only partition facts from the actual SM-A750F if source-level research cannot resolve topology.
-4. Avoid building or distributing an Android 17 image before the above gates are met.
+1. Find and evaluate a *real*, technically credible Exynos7885/SM-A750F kernel modernization path. A kernel version label or one BPF syscall flag is not enough.
+2. Resolve historical LineageOS 18.1 BSP dependencies and legally usable firmware-specific vendor interfaces to build a genuine baseline ROM.
+3. Freeze all target platform sources, then run genuine assembled SELinux, VINTF, BPF feature and native/HAL checks instead of interpreting isolated unit tests as Android 17 readiness.
 
-No public repository should contain proprietary firmware blobs, device IDs, EFS, or private partition dumps.
+Do not publish proprietary firmware, EFS or personal partition images in this repository.
+
+
+| G7t: Mailbox prototype fixed-channel binding guard | PENDING CI (default OFF, no device) | The unbound Exynos7885 mailbox prototype now requires a one-cell DT channel ID and checks that the message ID corresponds to the actual allocated mailbox channel before any AP→APM doorbell. Prevents arbitrary free-channel assignment or cross-channel send in prototype; **no DTS binding, no firmware I/O, no runtime test**. |
