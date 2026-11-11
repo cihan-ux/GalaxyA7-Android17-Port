@@ -40,6 +40,21 @@ The manifest fixes local project hashes but the full platform manifest
 continues tracking a branch; save `repo manifest -r` for a reproducible
 build once a checkout succeeds.
 
+A source-only staging helper now verifies that the source checkout is
+**exactly** the reviewed 18.1 A7 device commit with the expected Git origin
+and a clean worktree, shows a dry-run diff and then applies only two product
+Makefiles. It intentionally refuses to overwrite modified trees:
+
+```sh
+# Run from this research repository, after syncing the separate 19.1 tree.
+python3 tools/stage_lineage19_device.py --tree ~/android/lineage-19.1/device/samsung/a7y18lte
+python3 tools/stage_lineage19_device.py --tree ~/android/lineage-19.1/device/samsung/a7y18lte --apply
+```
+
+GitHub Actions runs this procedure against the pinned **actual Git device
+checkout**, verifies only the two Makefiles change, and checks the diff.
+This is not a full Soong or ROM compile.
+
 After checking the full upstream device tree and the diff, stage only
 `port/lineage-19.1/device/samsung/a7y18lte/{AndroidProducts.mk,lineage_a7y18lte.mk}`
 into `device/samsung/a7y18lte/`. These are **overlays**, not substitutes

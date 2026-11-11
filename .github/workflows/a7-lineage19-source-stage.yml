@@ -8,6 +8,8 @@ name: A7 LineageOS 19.1 source-stage validation (NO ROM)
       - 'manifests/lineage-19.1-a7y18lte-local.xml'
       - 'tools/check_lineage19_port.py'
       - 'tests/test_lineage19_port.py'
+      - 'tools/stage_lineage19_device.py'
+      - 'tests/test_stage_lineage19_device.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +28,25 @@ jobs:
           set -euo pipefail
           python3 tools/check_lineage19_port.py
           python3 -m unittest discover -s tests -p test_lineage19_port.py -v
+          python3 -m unittest discover -s tests -p test_stage_lineage19_device.py -v
+      - name: Fetch real pinned 18.1 A7 device tree and stage Android 12L source overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/a7-device-source"
+          git init "$dir"
+          git -C "$dir" remote add origin https://github.com/exynos7885-dev/device_samsung_a7y18lte.git
+          git -C "$dir" -c protocol.version=2 fetch --depth 1 origin f17643ba01010c45b628d5acb8f48350ded61606
+          git -C "$dir" checkout --detach FETCH_HEAD
+          python3 tools/stage_lineage19_device.py --tree "$dir"
+          test -z "$(git -C "$dir" status --porcelain)"
+          python3 tools/stage_lineage19_device.py --tree "$dir" --apply
+          test "$(git -C "$dir" diff --name-only | sort)" = "$(printf 'AndroidProducts.mk\\nlineage_a7y18lte.mk' | sort)"
+          git -C "$dir" diff --check
+          test -f "$dir/BoardConfig.mk"
+          test -f "$dir/device.mk"
+          test -f "$dir/manifest.xml"
+          printf '%s\\n' 'PASS: actual pinned device checkout staged; all other source files unchanged'
       - name: Check immutable upstream Android 12L and 18.1 source facts
         shell: bash
         run: |
