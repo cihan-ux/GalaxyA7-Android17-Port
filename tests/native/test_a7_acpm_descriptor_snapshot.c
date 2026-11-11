@@ -83,6 +83,24 @@ int main(void)
 	memcpy(b, a, sizeof(a)); rejected(&out);
 	fixture(); put(a, 0x100U, 4U); memcpy(b, a, sizeof(a)); rejected(&out);
 	fixture(); put(a, base + 52U, 1U); memcpy(b, a, sizeof(a)); rejected(&out);
+
+	/* Every region is in-bounds, but physical overlap must fail closed. */
+	fixture(); put(a, base + 40U, 0x100U); /* two index slots alias */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); put(a, base + 48U, 0x200U); /* RX/TX rings alias */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); put(a, base + 24U, 0x100U); /* ring overwrites indices */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); put(a, base + 16U, 0x200U); /* index inside queue */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); put(a, base + 24U, base); /* ring inside descriptor array */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); put(a, base + 24U, A7_ACPM_INITDATA_OFFSET); /* ring over prefix */
+	memcpy(b, a, sizeof(a)); rejected(&out);
+	fixture(); /* channel array overlaps firmware prefix, channel-2 still valid */
+	memcpy(a + A7_ACPM_INITDATA_OFFSET + 2U * 72U, a + base, 72U);
+	put(a, A7_ACPM_INITDATA_OFFSET + 8U, A7_ACPM_INITDATA_OFFSET);
+	memcpy(b, a, sizeof(a)); rejected(&out);
 	assert(memcmp(&before, &out, sizeof(out)) == 0);
 	puts("PASS: A7 firmware descriptor from two ordinary-RAM snapshots; bounded, stable, read-only");
 	puts("NO MMIO, IRQ, mailbox, firmware write, device probe, or flashable image");
