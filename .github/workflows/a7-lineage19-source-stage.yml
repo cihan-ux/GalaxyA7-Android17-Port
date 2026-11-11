@@ -41,12 +41,12 @@ jobs:
           python3 tools/stage_lineage19_device.py --tree "$dir"
           test -z "$(git -C "$dir" status --porcelain)"
           python3 tools/stage_lineage19_device.py --tree "$dir" --apply
-          test "$(git -C "$dir" diff --name-only | sort)" = "$(printf 'AndroidProducts.mk\\nlineage_a7y18lte.mk' | sort)"
+          test "$(git -C "$dir" diff --name-only | sort)" = "$(printf '%s\n' AndroidProducts.mk lineage_a7y18lte.mk | sort)"
           git -C "$dir" diff --check
           test -f "$dir/BoardConfig.mk"
           test -f "$dir/device.mk"
           test -f "$dir/manifest.xml"
-          printf '%s\\n' 'PASS: actual pinned device checkout staged; all other source files unchanged'
+          echo 'PASS: actual pinned device checkout staged; all other source files unchanged'
       - name: Check immutable upstream Android 12L and 18.1 source facts
         shell: bash
         run: |
