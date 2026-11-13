@@ -1,0 +1,61 @@
+name: A7 LineageOS 19.1 pinned FCM3 HAL declaration preflight (NOT VINTF)
+'on':
+  push:
+    branches: [dev/lineage-19.1-a7y18lte]
+    paths:
+      - '.github/workflows/a7-lineage19-fcm3-preflight.yml'
+      - 'tools/audit_lineage19_fcm3_hal.py'
+      - 'tests/test_lineage19_fcm3_hal.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-only-fcm3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Run coverage algorithm regression tests
+        run: python3 -m unittest discover -s tests -p test_lineage19_fcm3_hal.py -v
+      - name: Fetch pinned LineageOS 19.1 FCM and A7 legacy HAL declarations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          base=https://raw.githubusercontent.com
+          curl -fLsS --retry 3 "$base/exynos7885-dev/device_samsung_a7y18lte/f17643ba01010c45b628d5acb8f48350ded61606/manifest.xml" -o evidence/device.xml
+          curl -fLsS --retry 3 "$base/exynos7885-dev/device_samsung_exynos7885-common/f2ce8d2093711026f021cba7036334d381d455ef/manifest.xml" -o evidence/common.xml
+          curl -fLsS --retry 3 "$base/LineageOS/android_hardware_interfaces/ae469cee0dce6d71489588126a15da8e67a50102/compatibility_matrices/compatibility_matrix.3.xml" -o evidence/fcm3.xml
+          sha256sum evidence/device.xml evidence/common.xml evidence/fcm3.xml > evidence/pinned-input-sha256.txt
+          python3 tools/audit_lineage19_fcm3_hal.py \
+            --device-manifest evidence/device.xml \
+            --common-manifest evidence/common.xml \
+            --fcm3 evidence/fcm3.xml \
+            --json-out evidence/fcm3-report.json | tee evidence/source-preflight.txt
+      - name: Assert documented gap has not been silently hidden
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          result = json.load(open("evidence/fcm3-report.json", encoding="utf-8"))
+          assert result["mandatory_hal_groups"] == 9
+          assert result["plausible_declarations"] == 8, result["hal_groups"]
+          assert result["needs_further_evidence"] == ["android.hardware.drm"]
+          assert result["runtime_compatible"] is None
+          print("PASS: eight candidate HAL groups; DRM 1.1 not declared in two pinned source manifests")
+          print("This does NOT establish Android 12L VINTF/SELinux/vendor/runtime compatibility")
+          PY
+      - name: Preserve evidence without blobs or flashable images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a7-lineage19-fcm3-source-preflight-NOT-ROM
+          path: |
+            evidence/*.json
+            evidence/*.txt
+          if-no-files-found: warn
+          retention-days: 7
