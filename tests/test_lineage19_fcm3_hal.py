@@ -48,11 +48,10 @@ class ManifestCoverageTests(unittest.TestCase):
 
     def test_ignores_empty_override_marker(self):
         original = COMMON.replace(
-            "<version>1.0</version><interface><name>IDrmFactory</name><instance>default</instance></interface>",
+            "<version>1.0</version>\n<interface><name>IDrmFactory</name><instance>default</instance></interface>",
             "")
-        xml = original.replace("<name>android.hardware.drm</name>",
-                               '<name>android.hardware.drm</name>')
-        result = audit(DEVICE, xml, MATRIX)
+        self.assertNotEqual(original, COMMON, "test mutation must actually modify DRM XML")
+        result = audit(DEVICE, original, MATRIX)
         self.assertEqual(result["hal_groups"][2]["status"], "not_declared_in_two_sources")
 
     def test_version_range_and_regex_instance(self):
