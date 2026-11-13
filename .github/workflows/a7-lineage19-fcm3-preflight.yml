@@ -6,6 +6,8 @@ name: A7 LineageOS 19.1 pinned FCM3 HAL declaration preflight (NOT VINTF)
       - '.github/workflows/a7-lineage19-fcm3-preflight.yml'
       - 'tools/audit_lineage19_fcm3_hal.py'
       - 'tests/test_lineage19_fcm3_hal.py'
+      - 'tools/check_lineage19_vendor_drm.py'
+      - 'tests/test_lineage19_vendor_drm.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,7 +21,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Run coverage algorithm regression tests
-        run: python3 -m unittest discover -s tests -p test_lineage19_fcm3_hal.py -v
+        run: |
+          python3 -m unittest discover -s tests -p test_lineage19_fcm3_hal.py -v
+          python3 -m unittest discover -s tests -p test_lineage19_vendor_drm.py -v
       - name: Fetch pinned LineageOS 19.1 FCM and A7 legacy HAL declarations
         shell: bash
         run: |
@@ -49,6 +53,36 @@ jobs:
           print("PASS: eight candidate HAL groups; DRM 1.1 not declared in two pinned source manifests")
           print("This does NOT establish Android 12L VINTF/SELinux/vendor/runtime compatibility")
           PY
+      - name: Audit separate pinned Widevine vendor manifest fragment and packaging evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=https://raw.githubusercontent.com/exynos7885-dev
+          vendor="$base/proprietary_vendor_samsung_exynos7885-common/51a9202e8b6d5e4852fdfbb31e5cd1e6769599af"
+          common="$base/device_samsung_exynos7885-common/f2ce8d2093711026f021cba7036334d381d455ef"
+          curl -fLsS --retry 3 "$vendor/proprietary/vendor/etc/vintf/manifest/manifest_android.hardware.drm@1.3-service.widevine.xml" -o evidence/vendor-drm.xml
+          curl -fLsS --retry 3 "$vendor/Android.bp" -o evidence/vendor-blueprint.txt
+          curl -fLsS --retry 3 "$vendor/exynos7885-common-vendor.mk" -o evidence/vendor-make.txt
+          curl -fLsS --retry 3 "$common/exynos7885.mk" -o evidence/common-product.txt
+          python3 tools/check_lineage19_vendor_drm.py \
+            --fragment evidence/vendor-drm.xml \
+            --blueprint evidence/vendor-blueprint.txt \
+            --vendor-make evidence/vendor-make.txt \
+            --common-make evidence/common-product.txt \
+            --json-out evidence/vendor-drm-assembly.json | tee evidence/vendor-drm-status.txt
+          python3 - <<'PY'
+          import json
+          x = json.load(open("evidence/vendor-drm-assembly.json"))
+          assert x["vendor_xml_has_drm_1_3_fqnames"]
+          assert x["vendor_android_bp_prebuilt_registered"]
+          assert x["widevine_binary_copy_listed_in_vendor_makefile"]
+          assert x["clearkey_product_listed_in_common_makefile"]
+          assert not x["explicit_prebuilt_module_reference_in_two_makefiles"]
+          assert x["fragment_confirmed_in_android_12l_output"] is None
+          print("PASS: pinned source fragment exists, actual Android 12L installation remains UNVERIFIED")
+          PY
+          sha256sum evidence/vendor-drm.xml evidence/vendor-blueprint.txt \
+            evidence/vendor-make.txt evidence/common-product.txt > evidence/pinned-vendor-text-sha256.txt
       - name: Preserve evidence without blobs or flashable images
         if: always()
         uses: actions/upload-artifact@v4

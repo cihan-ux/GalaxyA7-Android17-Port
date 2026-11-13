@@ -23,8 +23,14 @@ source manifests: audio, audio effect, gatekeeper, graphics allocator,
 graphics composer, graphics mapper, health, and media OMX.
 
 **DRM version 1.1** is required by this matrix but **is not declared in
-these two files**. Another device/vendor/ODM manifest fragment may add
-it, or the port may require a legitimate service/vendor change.
+these two files**. A separate [pinned Exynos7885 vendor DRM fragment](https://github.com/exynos7885-dev/proprietary_vendor_samsung_exynos7885-common/blob/51a9202e8b6d5e4852fdfbb31e5cd1e6769599af/proprietary/vendor/etc/vintf/manifest/manifest_android.hardware.drm%401.3-service.widevine.xml)
+does declare **HIDL @1.3 ICryptoFactory and IDrmFactory (widevine)**. Its
+`Android.bp` registers a vendor `prebuilt_etc_xml` module. The inspected
+vendor and common product Makefiles do **not explicitly request that
+manifest prebuilt module**; whether another dependency installs it, or a
+ClearKey service supplies a separate manifest, is unresolved. Its presence
+in source does not prove that the Android 12L vendor image contains it.
+The port may require a legitimate service/vendor integration change.
 **Do not fabricate a DRM HAL declaration or bypass VINTF.** Declaring an
 interface is not proof that a matching service or hardware implementation
 exists.
@@ -37,7 +43,10 @@ merge/override and HIDL instance rules.
 
 [GitHub Actions](../.github/workflows/a7-lineage19-fcm3-preflight.yml) fetches
 the exact pinned upstream sources, reruns regression tests, produces a
-machine-readable report and explicitly asserts the DRM gap remains visible.
+machine-readable report and explicitly asserts the two-manifest DRM gap
+remains visible. A [separate vendor DRM packaging audit](../tools/check_lineage19_vendor_drm.py)
+inspects the public fragment, `Android.bp` registration and two Makefiles
+without copying proprietary executables.
 It does not fetch proprietary binaries or produce a ROM.
 
 ## Next real gate
