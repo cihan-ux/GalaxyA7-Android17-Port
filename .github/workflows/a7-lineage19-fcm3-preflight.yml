@@ -77,7 +77,7 @@ jobs:
           assert x["vendor_android_bp_prebuilt_registered"]
           assert x["widevine_binary_copy_listed_in_vendor_makefile"]
           assert x["clearkey_product_listed_in_common_makefile"]
-          assert not x["explicit_prebuilt_module_reference_in_two_makefiles"]
+          assert x["explicit_prebuilt_module_reference_in_two_makefiles"]
           assert x["fragment_confirmed_in_android_12l_output"] is None
           print("PASS: pinned source fragment exists, actual Android 12L installation remains UNVERIFIED")
           PY

@@ -25,11 +25,14 @@ graphics composer, graphics mapper, health, and media OMX.
 **DRM version 1.1** is required by this matrix but **is not declared in
 these two files**. A separate [pinned Exynos7885 vendor DRM fragment](https://github.com/exynos7885-dev/proprietary_vendor_samsung_exynos7885-common/blob/51a9202e8b6d5e4852fdfbb31e5cd1e6769599af/proprietary/vendor/etc/vintf/manifest/manifest_android.hardware.drm%401.3-service.widevine.xml)
 does declare **HIDL @1.3 ICryptoFactory and IDrmFactory (widevine)**. Its
-`Android.bp` registers a vendor `prebuilt_etc_xml` module. The inspected
-vendor and common product Makefiles do **not explicitly request that
-manifest prebuilt module**; whether another dependency installs it, or a
-ClearKey service supplies a separate manifest, is unresolved. Its presence
-in source does not prove that the Android 12L vendor image contains it.
+`Android.bp` registers a vendor `prebuilt_etc_xml` module. The pinned
+`exynos7885-common-vendor.mk` **explicitly lists that exact module in
+`PRODUCT_PACKAGES`**, alongside the Widevine service binary in
+`PRODUCT_COPY_FILES`. The common device product also requests a separate
+ClearKey service. This is positive **source-level packaging evidence**,
+but whether these instructions build successfully on Android 12L and
+whether the generated vendor image actually contains a compatible
+working service are still unverified.
 The port may require a legitimate service/vendor integration change.
 **Do not fabricate a DRM HAL declaration or bypass VINTF.** Declaring an
 interface is not proof that a matching service or hardware implementation

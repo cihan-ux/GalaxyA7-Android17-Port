@@ -84,8 +84,9 @@ The [mandatory FCM3 HAL report](lineage19-a7y18lte-fcm3-preflight.md)
 compares actual pinned Android 11 device/common declarations with the
 LineageOS 19.1 framework matrix. Eight mandatory HAL groups are visibly
 declared in those two manifests; DRM is described in a **separate vendor
-fragment**, but its inclusion in the assembled Android 12L image is not
-verified. A real `checkvintf` remains required; no VINTF rules were bypassed.
+fragment that the historical vendor Makefile explicitly installs as a
+`PRODUCT_PACKAGES` module**. Its inclusion in an assembled **Android 12L**
+image and its runtime compatibility are not verified. A real `checkvintf` remains required; no VINTF rules were bypassed.
 
 ## Design decisions and blockers
 

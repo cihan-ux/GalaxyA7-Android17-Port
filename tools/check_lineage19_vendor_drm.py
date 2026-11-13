@@ -74,7 +74,10 @@ def main() -> int:
         print("FAIL:", exc, file=sys.stderr)
         return 1
     print("SOURCE CONFIRMED: DRM @1.3 Widevine fragment and prebuilt_etc_xml registered")
-    print("ASSEMBLY UNKNOWN: not explicitly listed in the two inspected makefiles")
+    print("PACKAGING SOURCE:", "prebuilt is requested by a checked makefile"
+          if info["explicit_prebuilt_module_reference_in_two_makefiles"]
+          else "no explicit prebuilt reference in the checked makefiles")
+    print("ASSEMBLED IMAGE UNKNOWN: inspect built vendor/ODM outputs")
     print("NO RUNTIME CLAIM: the actual vendor image and checkvintf remain untested")
     if args.json_out:
         args.json_out.write_text(json.dumps(info, indent=2, sort_keys=True) + "\n",
