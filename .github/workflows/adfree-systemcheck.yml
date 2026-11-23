@@ -22,8 +22,11 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
       - name: Install Android 17 SDK
-        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
-          if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"; fi
+        run: |
+          sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+          if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
+            ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
+          fi
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.6.0'
