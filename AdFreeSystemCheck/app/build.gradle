@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.openutility.systemcheck'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId 'org.openutility.systemcheck'
+        minSdk 29      // Android 10
+        targetSdk 37   // Android 17
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+// No external dependencies, analytics SDK, ads SDK or in-app billing.
